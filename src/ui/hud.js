@@ -7,7 +7,7 @@ import { $, fmt, KEY } from './dom.js';
 const PROMPTS = {
   radio: (g) => g.radio.phase === 'repair' ? `${KEY('E')} Repair the radio` : g.radio.phase === 'call' ? `${KEY('E')} Call for help` : 'Radio: waiting on dispatch',
   ammo: (g) => g.player.reserve < g.cfg.pistol.maxReserve ? `${KEY('E')} Grab ammo` : 'Ammo full',
-  flares: (g) => g.carFlares <= 0 ? 'No flares left' : g.player.flares >= g.cfg.flares.carryMax ? 'Already holding a flare' : `${KEY('E')} Take a flare (${g.carFlares} left)`,
+  flares: (g) => g.player.flares >= g.cfg.flares.carryMax ? 'Already holding a flare' : g.t < g.flareReadyAt ? `Digging out the next flare… ${Math.ceil(g.flareReadyAt - g.t)}s` : `${KEY('E')} Take a flare`,
 };
 let lastPrompt = null, lastAmmo = null, lastFlare = null;
 
@@ -25,11 +25,11 @@ export function update(game, phase, world) {
   $('batt').classList.toggle('locked', P.flashlightLocked);
   $('batt').classList.toggle('low', b < 0.25);
 
-  // bottom right: ammo + reload hint, flare + throw hint
+  // bottom right: ammo + reload hint, flare + drop hint
   const ammoHtml = `<span class="count${P.mag === 0 && P.reloading <= 0 ? ' empty' : ''}">${P.mag} / ${P.reserve}</span>` +
     (P.reloading > 0 ? '<span class="hint">reloading…</span>' : P.mag < cfg.pistol.magSize && P.reserve > 0 ? `<span class="hint">${KEY('R')} reload</span>` : '');
   if (ammoHtml !== lastAmmo) { $('ammo').innerHTML = ammoHtml; lastAmmo = ammoHtml; }
-  const flareHtml = P.flares > 0 ? `<span class="hint flare">${KEY('Q')} throw flare</span>` : '';
+  const flareHtml = P.flares > 0 ? `<span class="hint flare">${KEY('Q')} drop flare</span>` : '';
   if (flareHtml !== lastFlare) { $('flare').innerHTML = flareHtml; lastFlare = flareHtml; }
 
   // interaction prompt at the car
@@ -87,5 +87,5 @@ export function onEvent(e, game) {
   if (e.type === 'reload_start') $('reloadBar').classList.remove('jam');
   if (e.type === 'radio_fixed') toast('Radio fixed. Call for help — hold E at the radio.');
   if (e.type === 'radio_called') toast('Dispatch copies. Help is on the way. Hold out.');
-  if (e.type === 'spawn' && e.count >= game.cfg.horde.max) toast('They\'re all here now.');
+  if (e.type === 'monster_gone' && e.left === 0) toast('The field is quiet. Nothing left out there.');
 }

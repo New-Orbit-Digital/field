@@ -18,7 +18,7 @@ await page.tap('#overlay');
 await page.waitForTimeout(Number(process.env.WAIT || 9000));
 const s = await page.evaluate(() => {
   const g = window.__field.game;
-  return { t: +g.t.toFixed(1), events: g.events.length, warns: g.events.filter(e => e.type === 'warn').length, flashOn: g.events.filter(e => e.type === 'flash_on').length, repels: g.events.filter(e => e.type === 'repel').length, hits: g.events.filter(e => e.type === 'hit').length, shots: g.events.filter(e => e.type === 'shot').length, dodges: g.events.filter(e => e.type === 'dodge').length, radio: +g.radio.repair.toFixed(1), overlayHidden: document.getElementById('overlay').hidden };
+  return { t: +g.t.toFixed(1), events: g.events.length, warns: g.events.filter(e => e.type === 'warn').length, flashOn: g.events.filter(e => e.type === 'flash_on').length, repels: g.events.filter(e => e.type === 'repel').length, hits: g.events.filter(e => e.type === 'hit').length, shots: g.events.filter(e => e.type === 'shot').length, scatters: g.events.filter(e => e.type === 'scatter').length, radio: +g.radio.repair.toFixed(1), overlayHidden: document.getElementById('overlay').hidden };
 });
 await page.screenshot({ path: 'shots/11-mobile-demo.png' });
 await browser.close();

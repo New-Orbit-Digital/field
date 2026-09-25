@@ -31,12 +31,13 @@ export function createAudio() {
       case 'lunge':
         for (let i = 0; i < 14; i++) crunch(pos.x, pos.z, { gain: 0.6, when: i * 0.06 + Math.random() * 0.03, pitch: 0.8 });
         break;
-      case 'dodge':
+      case 'scatter':
         for (let i = 0; i < 5; i++) crunch(pos.x, pos.z, { gain: 0.5, when: i * 0.035, pitch: 1.2 });
         break;
       case 'climb': scrape(pos.x, pos.z, cfg.monster.climbTime); break;
       case 'repel': case 'spotted': case 'shot_hit': shriek(pos.x, pos.z); break;
-      case 'spawn': moan(pos.x, pos.z); break;
+      case 'break_off': moan(pos.x, pos.z); break;
+      case 'fled_for_good': moan(pos.x, pos.z); break;
       case 'hit': thud(); heartbeat(); break;
       case 'knocked_off': thud(); break;
       case 'flash_on': case 'flash_off': click(); break;
@@ -52,7 +53,7 @@ export function createAudio() {
       case 'ammo_pickup': metalClick(0, 2600, 0.2); metalClick(0.08, 3000, 0.15); break;
       case 'flare_pickup': blip(520, 0, 0.1); break;
       case 'flare_throw': crunch(null, null, { gain: 0.15, pitch: 1.4 }); break;
-      case 'flare_land': hiss(e.pos.x, e.pos.z, cfg.flares.burnTime, 0.22, 3500); break;
+      case 'flare_land': hiss(e.pos.x, e.pos.z, e.burn || cfg.flares.burnTime, 0.22, 3500); break;
       case 'jump': crunch(null, null, { gain: 0.2, pitch: 0.7 }); break;
       case 'land': crunch(null, null, { gain: e.onCar ? 0.05 : 0.25, pitch: e.onCar ? 0.4 : 0.7 }); if (e.onCar) metalClick(0, 300, 0.25); break;
       case 'mantle_start': metalClick(0, 400, 0.2); break;

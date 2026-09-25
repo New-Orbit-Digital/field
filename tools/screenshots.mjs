@@ -26,8 +26,9 @@ async function pose(name, fn, wait = 900) {
 await page.evaluate(() => {
   window.__field.startHeadless('SHOTS');
   window.__field.frozen = true;
-  window.__park = (g) => g.monsters.forEach((m) => { m.pos = { x: 0, z: -40 }; m.mode = 'stalk'; });
-  window.__face = (g, name, pitch = -0.2) => {
+  // nobody hunting: everyone back in the crowd, flares cleared unless a pose adds one
+  window.__calm = (g) => { g.hordeTarget = 0; g.breakOffTimer = 1e9; g.monsters.forEach((m) => { if (m.mode !== 'shamble') { m.mode = 'shamble'; const b = Math.atan2(m.pos.x, m.pos.z); m.pos = { x: Math.sin(b) * 22, z: Math.cos(b) * 22 }; } }); };
+  window.__face = (g, name) => {
     const sp = window.__field.spot(name);
     g.player.pos = { ...sp.stand };
     g.player.yaw = Math.atan2(sp.face.x - sp.stand.x, sp.face.z - sp.stand.z);
@@ -35,69 +36,82 @@ await page.evaluate(() => {
   };
 });
 
-await pose('02-beast-at-edge', () => window.__field.set((g, v) => {
-  window.__park(g);
-  g.player.pos = { x: 0, z: 5 }; g.player.yaw = 0; v.pitch = -0.02;
-  g.monsters[0].mode = 'probe'; g.monsters[0].pos = { x: 1.2, z: 11.5 };
+await pose('02-night-start', () => window.__field.set((g, v) => {
+  // as the night starts: the one flare burning, the crowd out at the edge, headlights on the embankment behind
+  const f = g.flares[0];
+  g.player.pos = { x: 0, z: 5 }; g.player.yaw = Math.atan2(f.pos.x - 0, f.pos.z - 5) + 0.35; v.pitch = -0.02;
   g.t = 0.05;
-}));
+}), 1500);
 
-await pose('03-beast-lunge-flashlight', () => window.__field.set((g, v) => {
-  window.__park(g);
+await pose('03-lunge-in-beam', () => window.__field.set((g, v) => {
+  window.__calm(g);
   g.player.pos = { x: 2, z: 5 }; g.player.yaw = 0.15; g.player.flashlightOn = true; v.pitch = -0.02;
-  g.monsters[0].mode = 'commit'; g.monsters[0].pos = { x: 3.0, z: 10 };
+  const m = g.monsters[0]; m.mode = 'commit'; m.pos = { x: 3.0, z: 10.5 };
   g.t = 0.55 / g.cfg.arena.strobeHz;
 }));
 
-await pose('04-radio', () => window.__field.set((g, v) => {
-  window.__park(g);
-  window.__face(g, 'radio'); v.pitch = -0.3;
+await pose('04-crowd-in-beam', () => window.__field.set((g, v) => {
+  // near the edge of the dark, flashlight on the crowd
+  window.__calm(g);
+  g.flares = [];
+  const b = -0.4;
+  g.player.pos = { x: Math.sin(b) * 11, z: Math.cos(b) * 11 }; g.player.yaw = b; g.player.flashlightOn = true; v.pitch = 0.02;
+  [[-1.5, 19], [1.2, 21], [2.8, 18.5], [-3, 23], [0, 25]].forEach(([dx, r], i) => {
+    const m = g.monsters[i]; const bb = b + dx * 0.05; m.mode = 'shamble'; m.pos = { x: Math.sin(bb) * r + dx, z: Math.cos(bb) * r };
+  });
+  g.t = 0.3;
+}));
+
+await pose('05-headlight-shadows', () => window.__field.set((g, v) => {
+  // the far headlights behind you throw your shadow (and the wreck's) out ahead
+  window.__calm(g);
+  g.flares = [];
+  const b = g.cfg.arena.landmarkBearing;
+  g.player.pos = { x: Math.sin(b) * 3.5 + 1.5, z: Math.cos(b) * 3.5 }; g.player.yaw = b + Math.PI + 0.25; g.player.flashlightOn = false; v.pitch = -0.12;
+  g.t = 0.25; // strobes between flashes
+}));
+
+await pose('06-tracks', () => window.__field.set((g, v) => {
+  // from the roof, looking back along the skid, the flip and the drag
+  window.__calm(g);
+  const back = Math.atan2(-Math.cos(g.cfg.car.yaw), Math.sin(g.cfg.car.yaw)); // world bearing of the car's -x (rear) axis
+  g.flares = [{ pos: { x: Math.sin(back) * 6.5, z: Math.cos(back) * 6.5 }, from: { x: 0, z: 0 }, state: 'burning', t: 5, burn: 20 }];
+  g.player.pos = { x: Math.sin(back) * 0.4, z: Math.cos(back) * 0.4 }; g.player.y = g.cfg.car.top; g.player.onCar = true; g.player.grounded = true;
+  g.player.yaw = back; v.pitch = -0.35; g.player.flashlightOn = false;
+  g.t = 0.9 / g.cfg.arena.strobeHz;
+}), 1200);
+
+await pose('07-radio-under-flare', () => window.__field.set((g, v) => {
+  window.__calm(g);
+  g.player.y = 0; g.player.onCar = false;
+  const sp = window.__face(g, 'radio'); v.pitch = -0.3;
+  g.flares = [{ pos: { x: sp.stand.x + 0.5, z: sp.stand.z + 0.6 }, from: { ...sp.stand }, state: 'burning', t: 3, burn: 20 }];
   g.player.flashlightOn = false; g.player.interacting = true; g.player.activeSpot = 'radio';
   g.radio.repair = 17; g.t = 0.05;
 }));
 
-await pose('05-trunk', () => window.__field.set((g, v) => {
-  window.__face(g, 'ammo'); v.pitch = -0.3;
-  g.player.interacting = false; g.player.activeSpot = 'ammo'; g.player.reserve = 0;
-}));
-
-await pose('06-flare-burning', () => window.__field.set((g, v) => {
-  window.__park(g);
-  g.player.pos = { x: 0, z: 5 }; g.player.yaw = 0.3; v.pitch = -0.05; g.player.activeSpot = null;
-  g.flares = [{ pos: { x: 4.5, z: 15 }, from: { x: 0, z: 5 }, state: 'burning', t: 5 }];
-  g.monsters[0].mode = 'stalk'; g.monsters[0].pos = { x: 8.5, z: 19 };
-  g.t = 0.05;
-}));
-
-await pose('07-on-roof', () => window.__field.set((g, v) => {
-  window.__park(g);
+await pose('08-debug', () => window.__field.set((g, v) => {
+  g.player.pos = { x: 0, z: 5 }; g.player.yaw = 0.2; v.pitch = -0.05; g.player.interacting = false; g.player.activeSpot = null;
   g.flares = [];
-  g.player.pos = { x: 0.2, z: 0 }; g.player.y = g.cfg.car.top; g.player.onCar = true; g.player.grounded = true;
-  g.player.yaw = 2.0; v.pitch = -0.12; g.player.flashlightOn = true;
-  g.monsters[0].mode = 'climb'; g.monsters[0].pos = { x: 1.9, z: -0.9 };
-}));
-
-await pose('08-horde-debug', () => window.__field.set((g, v) => {
-  g.player.pos = { x: 0, z: 5 }; g.player.y = 0; g.player.onCar = false; g.player.yaw = 0.2; v.pitch = -0.05; g.player.flashlightOn = false;
-  while (g.monsters.length < 6) g.monsters.push({ ...g.monsters[0], id: g.monsters.length + 1, pos: { x: 0, z: 0 }, dodgeVel: { x: 0, z: 0 } });
-  const ring = [[-6, 14, 'stalk'], [7, 13, 'probe'], [-12, 2, 'warn'], [11, -4, 'stalk'], [0, -12, 'retreat'], [3.5, 12, 'commit']];
-  g.monsters.forEach((m, i) => { m.pos = { x: ring[i][0], z: ring[i][1] }; m.mode = ring[i][2]; });
+  const set = [[-6, 12, 'stalk'], [7, 11, 'probe'], [-10, 2, 'warn'], [0, -12, 'retreat']];
+  set.forEach(([x, z, mode], i) => { const m = g.monsters[i]; m.pos = { x, z }; m.mode = mode; });
   g.radio.phase = 'wait'; g.radio.rescueLeft = 40; g.radio.rescueDist = 25;
 }));
 await page.keyboard.press('Backquote');
 await page.waitForTimeout(500);
-await page.screenshot({ path: 'shots/08-horde-debug.png' });
+await page.screenshot({ path: 'shots/08-debug.png' });
 await page.keyboard.press('Backquote');
 
 await pose('09-rescue-close', () => window.__field.set((g, v) => {
-  window.__park(g);
+  window.__calm(g);
   const b = g.cfg.arena.landmarkBearing;
   g.player.pos = { x: Math.sin(b) * 5, z: Math.cos(b) * 5 }; g.player.yaw = b - 0.1; v.pitch = 0;
   g.radio.rescueDist = 16;
 }));
 
 await pose('11-reload-bar', () => window.__field.set((g, v) => {
-  window.__park(g);
+  window.__calm(g);
+  g.radio.phase = 'repair'; g.radio.rescueDist = g.cfg.arena.landmarkDistance;
   g.player.pos = { x: 0, z: 5 }; g.player.y = 0; g.player.yaw = 0.1; v.pitch = -0.05; g.player.flashlightOn = false;
   g.player.mag = 0; g.player.reserve = 12; g.player.reloading = 1.3; g.player.reloadTotal = 2.4; g.player.reloadWindow = { a: 0.48, b: 0.6 }; g.player.reloadTried = false;
   g.player.flares = 1;
@@ -105,8 +119,21 @@ await pose('11-reload-bar', () => window.__field.set((g, v) => {
 
 await pose('12-flare-prompt', () => window.__field.set((g, v) => {
   g.player.reloading = 0; g.player.reloadWindow = null; g.player.mag = 3; g.player.flares = 0;
-  window.__face(g, 'flares'); v.pitch = -0.25; g.player.activeSpot = 'flares';
+  window.__face(g, 'flares'); v.pitch = -0.25; g.player.activeSpot = 'flares'; g.flareReadyAt = g.t + 14;
 }));
+
+// Blood: shoot a hunter once and let it run for a moment (sim running), then look at the trail.
+await page.evaluate(() => window.__field.set((g, v) => {
+  window.__calm(g);
+  g.flareReadyAt = 0; g.flares = [{ pos: { x: -1, z: 8 }, from: { x: -1, z: 8 }, state: 'burning', t: 2, burn: 60 }];
+  g.player.pos = { x: 0, z: 5 }; g.player.yaw = 0; g.player.flashlightOn = false; v.pitch = -0.25;
+  const m = g.monsters[0]; m.mode = 'commit'; m.pos = { x: 0.4, z: 9 }; m.commitTime = 0; m.deep = false;
+}));
+await page.evaluate(() => window.__field.set((g) => { const m = g.monsters[0]; m.wounds = 1; m.mode = 'retreat'; m.timer = 6; m.fleeFrom = null; }));
+await page.evaluate(() => { window.__field.frozen = false; });
+await page.waitForTimeout(5000);
+await page.evaluate(() => { window.__field.frozen = true; });
+await pose('13-blood-trail', () => window.__field.set((g, v) => { g.player.yaw = 0; v.pitch = -0.3; g.t = Math.ceil(g.t * 1.6) / 1.6 + 0.25; }), 600);
 
 // Live run: unfreeze and let the sim play to catch runtime errors.
 await page.evaluate(() => { window.__field.startHeadless('LIVE'); window.__field.frozen = false; });
