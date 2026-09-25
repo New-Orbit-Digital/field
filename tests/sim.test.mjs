@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runHeadless, createGame, step, bearingTo, spotWorld, attackerCap, hunterCount, MODES, carDistance, reloadProgress, aimYaw, inBeam, HUNTING } from '../src/sim/game.js';
+import { runHeadless, createGame, step, bearingTo, spotWorld, attackerCap, hunterCount, MODES, carDistance, reloadProgress, aimYaw, inBeam, inFlare, flareRadius, HUNTING } from '../src/sim/game.js';
 import { idleBot, reactiveBot, objectiveBot } from '../src/sim/bots.js';
 
 const SEEDS = Array.from({ length: 40 }, (_, i) => `T${i}`);
@@ -334,6 +334,20 @@ test('Q drops the flare at your feet; its circle keeps them out, and they will n
   assert.ok(hunterCount(s) > 0, 'nobody came to wait at the edge');
   ticks(s, Math.ceil(s.cfg.flares.burnTime * 60), { yaw: 0 });
   assert.equal(s.flares.length, 0, 'flare should burn out');
+});
+
+test('a guttering flare protects a shrinking circle, matching its dying light', () => {
+  const s = createGame('GUTTER');
+  quiet(s);
+  const f = { pos: { x: 0, z: 8 }, from: { x: 0, z: 8 }, state: 'burning', t: 0, burn: 20 };
+  s.flares = [f];
+  const R = s.cfg.flares.radius;
+  f.t = 10; assert.equal(flareRadius(s, f), R);
+  const probe = { x: 0, z: 8 + R - 1 };
+  assert.ok(inFlare(s, probe), 'full flare should cover 8 m out');
+  f.t = f.burn - s.cfg.flares.gutterTime / 4; // light at a quarter
+  assert.ok(flareRadius(s, f) < R * 0.6, `circle did not shrink: ${flareRadius(s, f).toFixed(2)}`);
+  assert.ok(!inFlare(s, probe), 'a nearly-out flare still guards its full circle');
 });
 
 // ---------- climbing ----------

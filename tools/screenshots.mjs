@@ -135,6 +135,35 @@ await page.waitForTimeout(5000);
 await page.evaluate(() => { window.__field.frozen = true; });
 await pose('13-blood-trail', () => window.__field.set((g, v) => { g.player.yaw = 0; v.pitch = -0.3; g.t = Math.ceil(g.t * 1.6) / 1.6 + 0.25; }), 600);
 
+// The far vehicle up on the bank: a real shape, its lights, shafts in the snow, exhaust.
+await pose('14-embankment', () => window.__field.set((g, v) => {
+  window.__calm(g);
+  g.flares = [];
+  const b = g.cfg.arena.landmarkBearing;
+  g.radio.rescueDist = 26;
+  g.player.pos = { x: Math.sin(b) * 6 + 1, z: Math.cos(b) * 6 }; g.player.yaw = b + 0.12; v.pitch = 0.05; g.player.flashlightOn = false;
+  g.t = 0.25;
+}), 2500);
+
+// Footprints: walk a loop (sim frozen, positions moved by hand so the tracks get laid), then look back at them.
+await page.evaluate(() => window.__field.set((g, v) => {
+  window.__calm(g);
+  g.radio.rescueDist = g.cfg.arena.landmarkDistance;
+  g.flares = [{ pos: { x: 3, z: 7 }, from: { x: 3, z: 7 }, state: 'burning', t: 2, burn: 60 }];
+  g.player.pos = { x: 0, z: 5 }; g.player.flashlightOn = false; g.player.y = 0; g.player.onCar = false; g.player.grounded = true;
+  const m = g.monsters[1]; m.mode = 'stalk'; m.pos = { x: 7, z: 4 };
+}));
+for (let i = 0; i < 40; i++) {
+  await page.evaluate((i) => window.__field.set((g) => {
+    const a = i / 40 * Math.PI * 1.2;
+    g.player.pos = { x: 3 + Math.sin(a) * 3.5, z: 7 - Math.cos(a) * 3.5 + 1.5 };
+    g.player.yaw = a + Math.PI / 2;
+    g.monsters[1].pos = { x: 8 - i * 0.12, z: 4 + i * 0.2 };
+  }), i);
+  await page.waitForTimeout(120);
+}
+await pose('15-footprints', () => window.__field.set((g, v) => { g.player.pos = { x: 3, z: 3.2 }; g.player.yaw = 0.2; v.pitch = -0.45; g.t = 0.25; }), 1200);
+
 // Live run: unfreeze and let the sim play to catch runtime errors.
 await page.evaluate(() => { window.__field.startHeadless('LIVE'); window.__field.frozen = false; });
 await page.waitForTimeout(5000);
