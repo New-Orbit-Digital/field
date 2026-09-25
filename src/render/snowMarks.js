@@ -1,6 +1,6 @@
 // Marks in the snow around the wreck, painted onto one canvas laid over the terrain:
 //   - the tracks: tyre lines coming in, the sideways skid, the gouges where it flipped, the roof-drag trough
-//   - blood trails from wounded monsters (added live)
+//   - blood trails from wounded monsters, and footprints (yours and theirs), added live
 import * as THREE from 'three';
 import { groundHeight } from './ground.js';
 
@@ -49,6 +49,25 @@ export function createSnowMarks(cfg) {
       }
       dirty = true;
     },
+    // one print pressed into the snow: kind 'boot' (you) or 'paw' (them), facing `yaw`
+    print(x, z, yaw, kind) {
+      if (Math.abs(x) > SIZE / 2 - 1 || Math.abs(z) > SIZE / 2 - 1) return;
+      const c = Math.cos(yaw), s = Math.sin(yaw);
+      // local frame: +y along the direction of travel (world: forward = (sin yaw, cos yaw))
+      g.setTransform(S * c, -S * s, S * s, S * c, (x + SIZE / 2) * S, (z + SIZE / 2) * S);
+      if (kind === 'boot') {
+        g.fillStyle = 'rgba(78,90,110,0.42)';
+        g.beginPath(); g.ellipse(0, 0.05, 0.055, 0.1, 0, 0, Math.PI * 2); g.fill();          // sole
+        g.beginPath(); g.ellipse(0, -0.11, 0.045, 0.05, 0, 0, Math.PI * 2); g.fill();        // heel
+      } else {
+        g.fillStyle = 'rgba(70,80,100,0.38)';
+        g.beginPath(); g.ellipse(0, 0, 0.045, 0.065, 0, 0, Math.PI * 2); g.fill();           // pad
+        g.fillStyle = 'rgba(55,64,84,0.45)';
+        for (const dx of [-0.035, 0, 0.035]) { g.beginPath(); g.ellipse(dx, 0.085, 0.012, 0.03, 0, 0, Math.PI * 2); g.fill(); } // long claws
+      }
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      dirty = true;
+    },
     // a scuff where a bullet hit the snow
     scuff(x, z) {
       if (Math.abs(x) > SIZE / 2 - 1 || Math.abs(z) > SIZE / 2 - 1) return;
@@ -65,7 +84,7 @@ export function createSnowMarks(cfg) {
     },
     update(dt) {
       since += dt;
-      if (dirty && since > 0.15) { tex.needsUpdate = true; dirty = false; since = 0; }
+      if (dirty && since > 0.35) { tex.needsUpdate = true; dirty = false; since = 0; } // big texture: re-upload a few times a second at most
     },
   };
 }

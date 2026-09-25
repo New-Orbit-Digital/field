@@ -44,7 +44,8 @@ export function createFlareRig(scene, cfg) {
         const fl = burning[i];
         const l = lights[i];
         if (fl) {
-          const k = fl.t > fl.burn - 3 ? Math.max(0, (fl.burn - fl.t) / 3) : 1; // gutters out
+          const g = cfg.flares.gutterTime;
+          const k = fl.t > fl.burn - g ? Math.max(0, (fl.burn - fl.t) / g) : 1; // gutters out (the sim shrinks its circle to match)
           l.position.set(fl.pos.x, 0.45, fl.pos.z);
           l.intensity = (105 + Math.sin(t * 31 + i) * 14 + Math.random() * 22) * k;
         } else l.intensity = 0;

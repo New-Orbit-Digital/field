@@ -133,6 +133,7 @@ window.__field = {
   get game() { return game; },
   startHeadless(s) { seed = s; game = createGame(s); world.reset(); eventCursor = 0; phase = 'playing'; showOverlay(null); },
   set(fn) { fn(game, view); },
+  get world() { return world; },
   frozen: false,
   spot: (name) => spotWorld(game.cfg, name),
   MODES,
