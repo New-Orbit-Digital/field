@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FIELD</title>
+<link rel="stylesheet" href="./src/ui/styles.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="vignette"></div>
+<div id="hud">
+  <div id="time">0:00</div>
+  <div id="objective"></div>
+  <div id="demoTag" hidden>DEMO · scripted player</div>
+  <div id="toast"></div>
+  <div id="aim" hidden><div class="dot"></div><div id="reloadBar" hidden><div id="reloadZone"></div><div id="reloadMark"></div></div></div>
+  <div id="prompt"></div>
+  <div id="progress" hidden><div id="progressFill"></div></div>
+  <div id="status">
+    <div id="hp"></div>
+    <div class="label">FLASHLIGHT</div>
+    <div id="batt"><div id="battFill"></div></div>
+  </div>
+  <div id="weapons">
+    <div id="flare"></div>
+    <div id="ammo"></div>
+    <div class="label">PISTOL</div>
+  </div>
+</div>
+<div id="debug" hidden><div id="debugText"></div><canvas id="minimap" width="220" height="220"></canvas></div>
+<div id="overlay">
+  <div class="card" id="title">
+    <h1><span class="r">F</span>IEL<span class="b">D</span></h1>
+    <div class="sub">The radio's dead. Something is out there. Fix it, call for help, and hold out until they come.</div>
+    <div class="controls">
+      <b>WASD</b><span>move</span>
+      <b>Mouse</b><span>look / aim</span>
+      <b>Hold right click</b><span>flashlight</span>
+      <b>Left click</b><span>shoot</span>
+      <b>R</b><span>reload (no flashlight while you do)</span>
+      <b>Hold E</b><span>use the car: radio · trunk (ammo) · flares</span>
+      <b>Q</b><span>throw a flare</span>
+      <b>Space</b><span>jump — push into the car mid-jump to climb up</span>
+      <b>Esc · `</b><span>pause · debug</span>
+    </div>
+    <div class="sub">Stay in the light. Don't go out into the dark. Headphones — listen.</div>
+    <div class="sub" id="bestTitle"></div>
+    <div class="cta" id="cta">Click to begin</div>
+    <div class="sub" id="demoNote" hidden>You need a keyboard and mouse to play. On this device you'll watch a scripted player instead. Turn the sound up.</div>
+    <div class="sub" style="margin-top:14px;font-size:11px">seed <span id="titleSeed"></span></div>
+  </div>
+  <div class="card" id="paused" hidden>
+    <div class="big">PAUSED</div>
+    <div class="cta">Click to resume</div>
+  </div>
+  <div class="card" id="over" hidden>
+    <div class="sub" id="overTitle">You lasted</div>
+    <div class="big" id="overTime">0:00</div>
+    <div class="sub" id="overPhase"></div>
+    <div class="sub">Fastest rescue <span id="overBest"></span> · Drove off <span id="overRepels"></span> · Seed <span id="overSeed"></span></div>
+    <div class="cta">Click for a new night · R to replay this seed</div>
+  </div>
+</div>
+<script type="module" src="./dist/field.js"></script>
+</body>
+</html>

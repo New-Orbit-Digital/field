@@ -1,0 +1,20 @@
+{
+  "name": "field",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "FIELD — 3rd-person survival horror experiment (three.js)",
+  "scripts": {
+    "dev": "node tools/build.mjs --serve",
+    "build": "node tools/build.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "sim": "node tools/simreport.mjs",
+    "shots": "node tools/screenshots.mjs"
+  },
+  "dependencies": {
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
