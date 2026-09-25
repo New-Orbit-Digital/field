@@ -1,4 +1,4 @@
-// Debug-only ground rings: the edge of the light (green) and the start of the deep dark (red).
+// Debug-only ground rings: the edge of the dim play area / start of the deep dark (red), and the crowd's band (grey).
 import * as THREE from 'three';
 
 export function buildDebugRings(cfg) {
@@ -9,6 +9,6 @@ export function buildDebugRings(cfg) {
     m.rotation.x = -Math.PI / 2; m.position.y = 0.05;
     return m;
   };
-  group.add(ring(cfg.arena.lightRadius, 0x33ff88), ring(cfg.arena.lightRadius + cfg.monster.deepDarkMargin, 0xff3355));
+  group.add(ring(cfg.arena.darkRadius, 0xff3355), ring(cfg.horde.crowdInner, 0x777777), ring(cfg.horde.crowdOuter, 0x777777));
   return group;
 }

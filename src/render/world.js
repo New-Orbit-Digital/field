@@ -7,6 +7,8 @@ import { createPlayerRig } from './playerRig.js';
 import { createBeastPool } from './beastPool.js';
 import { createFlareRig } from './flareRig.js';
 import { buildDistantHeadlights } from './landmark.js';
+import { createSnowMarks } from './snowMarks.js';
+import { createImpacts } from './impacts.js';
 import { buildSnow } from './snow.js';
 import { createFollowCamera } from './followCamera.js';
 import { buildDebugRings } from './debugRings.js';
@@ -23,17 +25,20 @@ export function createWorld(canvas, cfg) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x020308);
   scene.fog = new THREE.FogExp2(0x03050a, 0.07);
-  scene.add(new THREE.HemisphereLight(0x1a2640, 0x050505, 0.12));
-  scene.add(buildGround());
+  scene.add(new THREE.HemisphereLight(0x1a2640, 0x050505, 0.1));
+  scene.add(buildGround(cfg));
+  const marks = createSnowMarks(cfg);   // tyre tracks + blood trails
+  scene.add(marks.mesh);
 
   const carRig = createCarRig(scene, cfg);
   const playerRig = createPlayerRig(scene, cfg);
-  const beasts = createBeastPool(scene);
+  const beasts = createBeastPool(scene, marks);
   const flares = createFlareRig(scene, cfg);
-  const landmark = buildDistantHeadlights(cfg.arena.landmarkBearing);
+  const impacts = createImpacts(scene, marks);
+  const landmark = buildDistantHeadlights(cfg);
   const snow = buildSnow();
   const debugRings = buildDebugRings(cfg);
-  scene.add(landmark.group, snow.points, debugRings);
+  scene.add(landmark.group, ...landmark.lights, snow.points, debugRings);
   const cam = createFollowCamera();
 
   function resize() {
@@ -46,6 +51,8 @@ export function createWorld(canvas, cfg) {
     cam.onEvent(e);
     playerRig.onEvent(e);
     beasts.onEvent(e);
+    impacts.onEvent(e);
+    if (e.type === 'wounded' || e.type === 'fled_for_good') marks.blood(e.pos.x, e.pos.z, 0.1, 6);
   }
 
   function update(state, view, dt) {
@@ -53,6 +60,8 @@ export function createWorld(canvas, cfg) {
     const py = playerRig.update(state, view, dt);
     beasts.update(state, dt);
     flares.update(state, dt);
+    impacts.update(dt);
+    marks.update(dt);
     landmark.setDistance(state.radio.rescueDist); // parked on the horizon until called, then drives in
     snow.update(dt, state.player.pos);
     cam.update(state, view, py, dt);
@@ -67,5 +76,7 @@ export function createWorld(canvas, cfg) {
   }
 
   resize();
-  return { renderer, scene, camera: cam.camera, update, resize, onEvent, reset: beasts.reset, aimScreen };
+  function reset() { beasts.reset(); marks.reset(); }
+
+  return { renderer, scene, camera: cam.camera, update, resize, onEvent, reset, aimScreen };
 }

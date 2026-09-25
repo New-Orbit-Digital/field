@@ -1,5 +1,6 @@
-// Thrown flares: the arc in flight, the burning glow, and a small fixed pool of lights
-// (preallocated so the light count never changes — no shader recompiles mid-game).
+// Flares: the short drop from your hand, the burning glow, and a small fixed pool of lights
+// (preallocated so the light count never changes — no shader recompiles mid-game). Each lights a circle the
+// size of cfg.flares.radius; the first one casts shadows.
 import * as THREE from 'three';
 import { glowTexture } from './textures.js';
 
@@ -8,7 +9,13 @@ const MAX_FLARE_LIGHTS = 3;
 export function createFlareRig(scene, cfg) {
   const lights = [];
   for (let i = 0; i < MAX_FLARE_LIGHTS; i++) {
-    const l = new THREE.PointLight(0xff5a2a, 0, cfg.flares.radius * 2.2, 1.2);
+    const l = new THREE.PointLight(0xff5a2a, 0, cfg.flares.radius * 1.9, 1.1);
+    if (i === 0) {
+      l.castShadow = true;
+      l.shadow.mapSize.set(512, 512);
+      l.shadow.camera.near = 0.1;
+      l.shadow.bias = -0.002;
+    }
     scene.add(l);
     lights.push(l);
   }
@@ -37,9 +44,9 @@ export function createFlareRig(scene, cfg) {
         const fl = burning[i];
         const l = lights[i];
         if (fl) {
-          const k = fl.t > cfg.flares.burnTime - 3 ? (cfg.flares.burnTime - fl.t) / 3 : 1; // gutters out
-          l.position.set(fl.pos.x, 0.5, fl.pos.z);
-          l.intensity = (160 + Math.sin(t * 31 + i) * 25 + Math.random() * 40) * k;
+          const k = fl.t > fl.burn - 3 ? Math.max(0, (fl.burn - fl.t) / 3) : 1; // gutters out
+          l.position.set(fl.pos.x, 0.45, fl.pos.z);
+          l.intensity = (105 + Math.sin(t * 31 + i) * 14 + Math.random() * 22) * k;
         } else l.intensity = 0;
       }
       let fi = 0;
@@ -48,8 +55,8 @@ export function createFlareRig(scene, cfg) {
         g.visible = true;
         if (fl.state === 'flying') {
           const k = Math.min(1, fl.t / cfg.flares.flightTime);
-          g.position.set(fl.from.x + (fl.pos.x - fl.from.x) * k, 1.3 + Math.sin(k * Math.PI) * 2.2 - k * 1.3, fl.from.z + (fl.pos.z - fl.from.z) * k);
-          g.rotation.y += dt * 12;
+          g.position.set(fl.from.x + (fl.pos.x - fl.from.x) * k, 1.0 * (1 - k * k), fl.from.z + (fl.pos.z - fl.from.z) * k);
+          g.rotation.y += dt * 6;
         } else {
           g.position.set(fl.pos.x, 0, fl.pos.z);
         }
