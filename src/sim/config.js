@@ -84,6 +84,7 @@ export const CONFIG = {
     startBurnTime: 30,     // the one already burning when the night starts
     startDistance: 5,      // …this far from the wreck, on the side away from the headlights
     radius: 9,             // lights (and keeps them out of) a circle this big
+    gutterTime: 3,         // over its last few seconds the light dies down — and so does the circle it protects
   },
   radio: {
     repairTime: 40,        // cumulative seconds of holding E at the radio

@@ -31,8 +31,15 @@ export function beamOffset(state, pos) {
   return wrapAngle(bearingTo(state.player.pos, pos) - aimYaw(state));
 }
 
+// A flare's reach: its full radius, shrinking as it gutters out over its last few seconds (matching the light).
+export function flareRadius(state, f) {
+  const fc = state.cfg.flares;
+  const left = f.burn - f.t;
+  return left >= fc.gutterTime ? fc.radius : fc.radius * Math.sqrt(Math.max(0, left / fc.gutterTime));
+}
+
 export function inFlare(state, pos, pad = 0) {
-  for (const f of state.flares) if (f.state === 'burning' && dist(f.pos, pos) < state.cfg.flares.radius + pad) return f;
+  for (const f of state.flares) if (f.state === 'burning' && dist(f.pos, pos) < flareRadius(state, f) + pad) return f;
   return null;
 }
 
