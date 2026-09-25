@@ -5,7 +5,8 @@ Third-person survival horror experiment. An overturned cop car sits in a snowy f
 v1 is three.js in the browser. If the game holds up, it gets remade in Godot.
 
 ## Play
-- **Easiest:** open `dist/field.html` (single file, works offline) after `npm run build`.
+- **Latest build online (private to Justin):** https://claude.ai/artifact/Fu74WT52xE9PPFknEr82k2 — republished from `dist/field.artifact.html` after each change.
+- **Offline:** open `dist/field.html` (single file, works offline) after `npm run build`.
 - **Dev:** `npm install`, then `npm run dev` → http://localhost:8000 (rebuilds on save).
 - Headphones strongly recommended. Warnings are positional audio.
 
@@ -61,7 +62,7 @@ tools/                 build, balance report, headless screenshots, phone demo c
 |---|---|
 | `npm test` | 19 headless sim tests: determinism, honest tells, attack spread/timing, dodge, car pickups, radio → rescue, reload/active reload, recoil, flares, jump/mantle/roof, horde cap, battery, deep dark |
 | `npm run sim` | Balance report: defence-only survival and objective win rates for scripted players of different skill |
-| `npm run build` | `dist/field.js` + single-file `dist/field.html` |
+| `npm run build` | `dist/field.js`, single-file `dist/field.html`, and `dist/field.artifact.html` (for the claude.ai page) |
 | `npm run shots` | Headless Chromium screenshots of posed scenes → `shots/` |
 
 Tunables live in `src/sim/config.js`.

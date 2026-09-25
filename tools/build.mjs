@@ -30,4 +30,13 @@ if (serve) {
     .replace('<script type="module" src="./dist/field.js"></script>', () => `<script type="module">\n${js}\n</script>`);
   writeFileSync('dist/field.html', html);
   console.log(`dist/field.html ${(html.length / 1024).toFixed(0)} KB (single file, playable offline)`);
+
+  // Artifact version: claude.ai wraps published pages in its own <html>/<head>/<body>, so emit
+  // just <title> + <style> + body content + script.
+  const title = html.match(/<title>[\s\S]*?<\/title>/)[0];
+  const style = html.match(/<style>[\s\S]*?<\/style>/)[0];
+  const body = html.match(/<body>([\s\S]*)<\/body>/)[1];
+  const artifact = `${title}\n${style.replace('<style>', '<style>\n:root { color-scheme: dark; }')}\n${body}`;
+  writeFileSync('dist/field.artifact.html', artifact);
+  console.log(`dist/field.artifact.html ${(artifact.length / 1024).toFixed(0)} KB (for claude.ai artifact publishing)`);
 }
