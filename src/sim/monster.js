@@ -8,7 +8,7 @@ import { MODES, ATTACKING } from './modes.js';
 import { emit } from './events.js';
 import { attackerCap, attackerCount } from './horde.js';
 import { bearingTo, dist, forward, len, moveToward, wrapAngle } from './math.js';
-import { beamOffset, inBeam, inDeepDark, inDimArea, inFlare, inViewGeometry, isLit } from './perception.js';
+import { beamOffset, flareRadius, inBeam, inDeepDark, inDimArea, inFlare, inViewGeometry, isLit } from './perception.js';
 import { hitPlayer } from './player.js';
 
 // Where a hunter waits: a few metres from you, but never inside a flare's circle.
@@ -19,10 +19,10 @@ export function stalkPoint(state, bearing, rho = state.cfg.monster.stalkMinDist)
 }
 
 export function outsideFlares(state, p, pad) {
-  const R = state.cfg.flares.radius + pad;
   for (let pass = 0; pass < 3; pass++) {
     const fl = inFlare(state, p, pad);
     if (!fl) break;
+    const R = flareRadius(state, fl) + pad;
     let dx = p.x - fl.pos.x, dz = p.z - fl.pos.z;
     let n = Math.hypot(dx, dz);
     if (n < 1e-3) { dx = 1; dz = 0; n = 1; }
@@ -46,7 +46,7 @@ function fleeDir(state, M, from) {
   }
   for (const fl of state.flares) {
     if (fl.state !== 'burning') continue;
-    const d = dist(fl.pos, M.pos), R = state.cfg.flares.radius + 2;
+    const d = dist(fl.pos, M.pos), R = flareRadius(state, fl) + 2;
     if (d < R) {
       const k = mc.fleeFlareSteer * (1 - d / R) * 2;
       ax += ((M.pos.x - fl.pos.x) / (d || 1)) * k; az += ((M.pos.z - fl.pos.z) / (d || 1)) * k;

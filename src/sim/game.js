@@ -97,7 +97,7 @@ export function runHeadless(seed, policy, { maxTime = 600, overrides } = {}) {
 // ---------- public API (used by the renderer, UI, bots and tests) ----------
 export { forward, bearingTo, wrapAngle } from './math.js';
 export { worldToCar, carToWorld, carDistance, spotWorld } from './car.js';
-export { aimYaw, inViewGeometry, inBeam, inFlare, inDimArea, isLit, monsterVisible, inDeepDark } from './perception.js';
+export { aimYaw, inViewGeometry, inBeam, inFlare, flareRadius, inDimArea, isLit, monsterVisible, inDeepDark } from './perception.js';
 export { MODES, HUNTING } from './modes.js';
 export { attackerCap, hunterCount } from './horde.js';
 export { reloadProgress } from './pistol.js';
