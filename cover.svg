@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 640 360">
+<title>FIELD: an overturned cop car in a snowy field at night</title>
+<defs>
+<radialGradient id="pool" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#9fb3c8" stop-opacity="0.55"/><stop offset="1" stop-color="#9fb3c8" stop-opacity="0"/></radialGradient>
+<radialGradient id="red" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ff2a2a" stop-opacity="0.7"/><stop offset="1" stop-color="#ff2a2a" stop-opacity="0"/></radialGradient>
+<radialGradient id="blue" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#2a5bff" stop-opacity="0.7"/><stop offset="1" stop-color="#2a5bff" stop-opacity="0"/></radialGradient>
+<linearGradient id="beam" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff6d8" stop-opacity="0.6"/><stop offset="1" stop-color="#fff6d8" stop-opacity="0"/></linearGradient>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#02030a"/><stop offset="1" stop-color="#0b0f18"/></linearGradient>
+</defs>
+<rect width="640" height="360" fill="url(#sky)"/>
+<rect y="190" width="640" height="170" fill="#0d121b"/>
+<ellipse cx="300" cy="265" rx="250" ry="70" fill="url(#pool)"/>
+<ellipse cx="250" cy="240" rx="130" ry="60" fill="url(#red)"/>
+<ellipse cx="360" cy="240" rx="130" ry="60" fill="url(#blue)"/>
+<circle cx="596" cy="186" r="2.2" fill="#fff4c0"/><circle cx="606" cy="186" r="2.2" fill="#fff4c0"/>
+<g transform="rotate(-8 300 235)">
+<rect x="225" y="222" width="150" height="34" rx="6" fill="#1a1d24"/>
+<rect x="250" y="208" width="90" height="18" rx="4" fill="#23272f"/>
+<rect x="276" y="252" width="16" height="7" fill="#ff3030"/><rect x="292" y="252" width="16" height="7" fill="#3060ff"/>
+<circle cx="245" cy="220" r="12" fill="#0a0b0e"/><circle cx="355" cy="220" r="12" fill="#0a0b0e"/>
+</g>
+<path d="M392 282 L560 238 L566 300 Z" fill="url(#beam)"/>
+<g fill="#07080b"><rect x="382" y="262" width="12" height="30" rx="4"/><circle cx="388" cy="256" r="6"/></g>
+<g fill="#050507"><path d="M520 262 q18 -18 44 -8 l10 12 l-6 14 l-6 -10 l-10 12 l-4 -12 l-14 10 l-2 -12 l-10 8 z"/></g>
+<circle cx="562" cy="258" r="1.6" fill="#ffd26a"/><circle cx="568" cy="259" r="1.6" fill="#ffd26a"/>
+<g fill="#ffffff" opacity="0.7"><circle cx="40" cy="60" r="1"/><circle cx="120" cy="140" r="1.2"/><circle cx="200" cy="40" r="0.8"/><circle cx="330" cy="110" r="1"/><circle cx="420" cy="70" r="1.2"/><circle cx="500" cy="150" r="0.9"/><circle cx="600" cy="50" r="1"/><circle cx="80" cy="230" r="1.1"/><circle cx="460" cy="320" r="1"/><circle cx="160" cy="310" r="1.2"/><circle cx="560" cy="120" r="0.8"/><circle cx="260" cy="170" r="1"/></g>
+<text x="32" y="60" font-family="Georgia, serif" font-size="40" letter-spacing="8" fill="#e8ecf2"><tspan fill="#ff3b3b">F</tspan>IEL<tspan fill="#4a78ff">D</tspan></text>
+</svg>

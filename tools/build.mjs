@@ -1,5 +1,6 @@
-// Build: bundles src/main.js -> dist/field.js, plus a single-file dist/field.html.
-// `--serve` runs a dev server with rebuild on change at http://localhost:8000
+// Build: bundles src/main.js -> dist/field.js, plus single-file dist/field.html (offline) and
+// dist/field.artifact.html (claude.ai page). GitHub Pages (justbost.com/field/) needs no build:
+// it serves index.html + src/ directly. `--serve` runs a local static server at http://localhost:8000
 import * as esbuild from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
@@ -27,7 +28,8 @@ if (serve) {
   const css = readFileSync('src/ui/styles.css', 'utf8');
   const html = readFileSync('index.html', 'utf8')
     .replace('<link rel="stylesheet" href="./src/ui/styles.css">', () => `<style>\n${css}</style>`)
-    .replace('<script type="module" src="./dist/field.js"></script>', () => `<script type="module">\n${js}\n</script>`);
+    .replace(/<!-- No build step[\s\S]*?<script type="importmap">[\s\S]*?<\/script>\n/, '')
+    .replace('<script type="module" src="./src/main.js"></script>', () => `<script type="module">\n${js}\n</script>`);
   writeFileSync('dist/field.html', html);
   console.log(`dist/field.html ${(html.length / 1024).toFixed(0)} KB (single file, playable offline)`);
 

@@ -5,9 +5,10 @@ Third-person survival horror experiment. An overturned cop car sits in a snowy f
 v1 is three.js in the browser. If the game holds up, it gets remade in Godot.
 
 ## Play
-- **Latest build online (private to Justin):** https://claude.ai/artifact/Fu74WT52xE9PPFknEr82k2 — republished from `dist/field.artifact.html` after each change.
+- **Online:** https://justbost.com/field/ — GitHub Pages serves `index.html` + `src/` straight from `main` (no build step; three.js loads from the jsdelivr CDN via an import map). Every push to `main` is live.
+- **Private copy on claude.ai:** https://claude.ai/artifact/Fu74WT52xE9PPFknEr82k2 (from `dist/field.artifact.html`).
 - **Offline:** open `dist/field.html` (single file, works offline) after `npm run build`.
-- **Dev:** `npm install`, then `npm run dev` → http://localhost:8000 (rebuilds on save).
+- **Dev:** `npm install`, then `npm run dev` → http://localhost:8000.
 - Headphones strongly recommended. Warnings are positional audio.
 
 Goal: fix the radio, call for help, survive until the rescue vehicle arrives. More of them come as the night goes on.
@@ -64,5 +65,6 @@ tools/                 build, balance report, headless screenshots, phone demo c
 | `npm run sim` | Balance report: defence-only survival and objective win rates for scripted players of different skill |
 | `npm run build` | `dist/field.js`, single-file `dist/field.html`, and `dist/field.artifact.html` (for the claude.ai page) |
 | `npm run shots` | Headless Chromium screenshots of posed scenes → `shots/` |
+| `npm run pages-check` | Loads the no-build Pages version under `/field/` (CDN answered from `node_modules`) and fails on any error |
 
 Tunables live in `src/sim/config.js`.

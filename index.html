@@ -62,6 +62,8 @@
     <div class="cta">Click for a new night · R to replay this seed</div>
   </div>
 </div>
-<script type="module" src="./dist/field.js"></script>
+<!-- No build step to play: GitHub Pages serves src/ directly; three.js comes from the CDN. -->
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js" } }</script>
+<script type="module" src="./src/main.js"></script>
 </body>
 </html>
