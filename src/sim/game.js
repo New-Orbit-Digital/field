@@ -2,9 +2,9 @@
 // This file wires the systems together and re-exports the public API.
 import { CONFIG } from './config.js';
 import { makeRng } from './rng.js';
-import { stepFlares } from './flares.js';
-import { spawnMonster, stepHorde } from './horde.js';
-import { stepMonster } from './monster.js';
+import { startFlare, stepFlares } from './flares.js';
+import { createCrowd, stepHorde } from './horde.js';
+import { stepDeepDark, stepMonster } from './monster.js';
 import { stepPlayer } from './player.js';
 import { stepRadio } from './radio.js';
 
@@ -22,11 +22,13 @@ export function createGame(seed, overrides = {}) {
     events: [],
     attackId: 0,
     nextMonsterId: 1,
-    hordeTarget: 1,
+    hordeTarget: 1,          // how many should be hunting you (the rest shamble at the edge)
+    breakOffTimer: 3,
     waitSpawnTimer: cfg.horde.waitSpawnEvery,
     radio: { phase: 'repair', repair: 0, call: 0, rescueLeft: null, rescueDist: cfg.arena.landmarkDistance },
     flares: [],            // { pos, state: 'flying'|'burning', t, from }
     carFlares: cfg.flares.carSupply,
+    flareReadyAt: 0,       // the flare box hands out the next one from this time
     player: {
       pos: { x: 0, z: 5 },
       y: 0, vy: 0, grounded: true, onCar: false, mantle: 0,
@@ -52,7 +54,8 @@ export function createGame(seed, overrides = {}) {
     },
     monsters: [],
   };
-  spawnMonster(state, { x: 0, z: -18 });
+  createCrowd(state);
+  startFlare(state);
   return state;
 }
 
@@ -73,6 +76,7 @@ export function step(state, input, dt = state.cfg.sim.dt) {
   stepRadio(state, dt);
   stepFlares(state, dt);
   stepHorde(state, dt);
+  stepDeepDark(state);
   for (const m of state.monsters) stepMonster(state, m, dt);
 }
 
@@ -93,7 +97,7 @@ export function runHeadless(seed, policy, { maxTime = 600, overrides } = {}) {
 // ---------- public API (used by the renderer, UI, bots and tests) ----------
 export { forward, bearingTo, wrapAngle } from './math.js';
 export { worldToCar, carToWorld, carDistance, spotWorld } from './car.js';
-export { aimYaw, inViewGeometry, inBeam, inFlare, isLit, monsterVisible, inDeepDark } from './perception.js';
-export { MODES } from './modes.js';
-export { attackerCap } from './horde.js';
+export { aimYaw, inViewGeometry, inBeam, inFlare, inDimArea, isLit, monsterVisible, inDeepDark } from './perception.js';
+export { MODES, HUNTING } from './modes.js';
+export { attackerCap, hunterCount } from './horde.js';
 export { reloadProgress } from './pistol.js';

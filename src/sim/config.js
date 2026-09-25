@@ -3,11 +3,12 @@ const DEG = Math.PI / 180;
 
 export const CONFIG = {
   arena: {
-    lightRadius: 9,        // radius of the cop-car light circle
+    darkRadius: 14,        // the dim play area around the wreck (lit by the far headlights + strobes); past it is the crowd
     boundRadius: 30,       // hard edge of the playable field
     strobeHz: 1.6,         // red/blue alternation rate (visual)
-    landmarkDistance: 50,  // distant vehicle (steady headlights) — rescue drives in from here
+    landmarkDistance: 50,  // vehicle up on the embankment (steady headlights aimed at the wreck) — rescue drives in from here
     landmarkBearing: 2.3,  // world bearing from the wreck (radians)
+    embankmentHeight: 4,   // how far above the field the headlights sit, so the crowd rarely blocks them
   },
   car: {
     yaw: 0.4,              // must match the rendered wreck's rotation
@@ -73,13 +74,16 @@ export const CONFIG = {
     pickupTime: 1.2,
   },
   flares: {
-    carSupply: 8,          // total in the car
+    carSupply: Infinity,   // the box never runs out — you just have to go back to the car for each one
     carryMax: 1,           // one at a time
-    pickupTime: 1.0,
-    throwDist: 11,
-    flightTime: 0.7,
-    burnTime: 25,
-    radius: 5.5,           // it won't enter this
+    pickupTime: 2.0,
+    restockTime: 35,       // after you take one, the next isn't ready for this long (0 = no wait). Keeps a flare a reprieve, not a wall.
+    dropDist: 0.8,         // dropped right in front of your feet
+    flightTime: 0.3,
+    burnTime: 20,
+    startBurnTime: 30,     // the one already burning when the night starts
+    startDistance: 5,      // …this far from the wreck, on the side away from the headlights
+    radius: 9,             // lights (and keeps them out of) a circle this big
   },
   radio: {
     repairTime: 40,        // cumulative seconds of holding E at the radio
@@ -87,12 +91,19 @@ export const CONFIG = {
     rescueTime: 90,        // seconds after the call until help arrives (headlights drive in)
     rescueEndDistance: 12, // headlights stop here: rescued
   },
+  // The crowd at the edge of the dark. It's one pool: hunters break off from it and go back to it.
   horde: {
-    max: 8,
-    repairRampEvery: 90,   // while repairing, +1 every N s…
+    crowd: 18,             // monsters shambling at the edge when the night starts
+    crowdInner: 18,        // they wander between these distances from the wreck
+    crowdOuter: 27,
+    shambleSpeed: 0.55,
+    max: 8,                // most hunters out at once
+    repairRampEvery: 90,   // while repairing, +1 hunter every N s…
     repairRampCap: 3,      // …up to this many
-    waitSpawnEvery: 15,    // after the call, +1 every N s up to max
-    spawnDist: 30,
+    waitSpawnEvery: 15,    // after the call, +1 hunter every N s up to max
+    breakOffMin: 2,        // delay before a replacement hunter breaks off
+    breakOffMax: 6,
+    goneDist: 55,          // a twice-shot monster runs this far out and is gone for good
   },
   monster: {
     stalkMinDist: 7,
@@ -108,38 +119,31 @@ export const CONFIG = {
     warnTime: 0.9,
     commitSpeedDark: 8,
     commitSpeedLight: 6,
-    beamSlow: 0.4,         // the beam slows a lunge, but it can scramble out of it
-    repelTime: 0.5,        // cumulative beam time to repel a commit (resets as it dodges)
-    beamDecay: 4,          // beamAccum drains fast once it's out of the beam
-    spotRepelTime: 0.45,
+    fleeReaction: 0.12,    // beam on it this long → it runs
+    closeCharge: 2,        // …unless it's already this close to you mid-lunge: then it keeps coming
+    fleeSpeed: 9,
+    fleeBeamSteer: 1.4,    // how hard a fleeing monster veers out of the beam
+    fleeFlareSteer: 1.2,   // …and away from flares
+    scatterTime: 0.9,      // a lit shambler at the edge scatters this long
+    scatterSpeed: 6,
+    impactRadius: 5,       // monsters this close to where a bullet lands run from it
+    impactDist: 14,        // a miss lands in the snow about this far out
+    spotRepelTime: 0.45,   // (climbing) cumulative beam time to knock it off the car
+    beamDecay: 4,
     hitRange: 1.1,
     commitTimeout: 5,
-    retreatSpeed: 9,
-    retreatDist: 10,
-    doubleTapChance: 0.2,
-    doubleTapDelayMin: 0.6,
-    doubleTapDelayMax: 1.3,
-    // Scramble out of the beam
-    dodgeChance: 0.7,      // chance to dodge each time the beam lands (or re-lands after cooldown)
-    dodgeReaction: 0.12,   // how long the beam is on it before it reacts
-    dodgeSpeed: 11,
-    dodgeTime: 0.3,
-    dodgeCooldown: 0.6,
-    dodgeForwardAngle: 35 * DEG, // during a lunge the scramble also closes distance
+    doubleTapChance: 0.2,  // sometimes it turns straight back round instead of rejoining the crowd
     // Climbing the car after you
     climbTime: 1.0,        // telegraphed (scrape) — flashlight or gun can knock it off
     climbReach: 2.4,
     // Several of them
     attackerCapBase: 1,    // concurrent warn/commit/climb allowed = base + floor((n-1)/perExtra)
     attackerPerExtra: 99,  // tuned: a 2nd simultaneous attacker made the wait phase unwinnable (see balance notes)
-    // Deep dark
-    deepDarkMargin: 5,
+    // Walking out into the dark: the crowd is right there
     deepDarkWarnTime: 0.5,
     deepDarkSpeedMult: 1.4,
-    deepDarkBeamSlow: 0.55,
-    deepDarkCanRepel: false,
-    deepDarkReturnDelay: 0.3,
-    deepDarkStrikeDist: 6,
+    deepDarkPack: 3,       // how many of the crowd come for you at once
+    deepDarkRange: 16,     // …from this close
   },
   sim: {
     dt: 1 / 60,

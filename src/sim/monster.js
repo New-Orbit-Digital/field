@@ -1,88 +1,122 @@
-// One monster's AI: stalk → probe → warn → commit (lunge) → climb → retreat, plus dodging the beam.
+// One monster's AI.
+//   shamble (in the crowd at the edge) → break off → stalk → probe / warn → commit (lunge) → climb
+//   → retreat back to the dark → rejoin the crowd.  Shot twice → gone for good.
+// Light is the rule: any beam that lands on it sends it running (scattering, for the crowd), unless it's
+// already within `closeCharge` of you mid-lunge. It won't enter a flare's circle. It runs from bullet impacts.
 import { pushOutOfCar } from './car.js';
-import { MODES } from './modes.js';
+import { MODES, ATTACKING } from './modes.js';
 import { emit } from './events.js';
 import { attackerCap, attackerCount } from './horde.js';
 import { bearingTo, dist, forward, len, moveToward, wrapAngle } from './math.js';
-import { inBeam, inDeepDark, inFlare, inViewGeometry, isLit } from './perception.js';
+import { beamOffset, inBeam, inDeepDark, inDimArea, inFlare, inViewGeometry, isLit } from './perception.js';
 import { hitPlayer } from './player.js';
 
-export function stalkDistance(state, bearing) {
-  const { player, cfg } = state;
-  const need = cfg.arena.lightRadius + cfg.monster.darkMargin;
+// Where a hunter waits: a few metres from you, but never inside a flare's circle.
+export function stalkPoint(state, bearing, rho = state.cfg.monster.stalkMinDist) {
   const f = forward(bearing);
-  const b = player.pos.x * f.x + player.pos.z * f.z;
-  const c = player.pos.x ** 2 + player.pos.z ** 2 - need * need;
-  const disc = b * b - c;
-  const rho = disc > 0 ? -b + Math.sqrt(disc) : 0;
-  return Math.max(cfg.monster.stalkMinDist, rho);
+  const p = { x: state.player.pos.x + f.x * rho, z: state.player.pos.z + f.z * rho };
+  return outsideFlares(state, p, 1.2);
 }
 
-export function placeAround(state, bearing, rho) {
-  const f = forward(bearing);
-  return { x: state.player.pos.x + f.x * rho, z: state.player.pos.z + f.z * rho };
+export function outsideFlares(state, p, pad) {
+  const R = state.cfg.flares.radius + pad;
+  for (let pass = 0; pass < 3; pass++) {
+    const fl = inFlare(state, p, pad);
+    if (!fl) break;
+    let dx = p.x - fl.pos.x, dz = p.z - fl.pos.z;
+    let n = Math.hypot(dx, dz);
+    if (n < 1e-3) { dx = 1; dz = 0; n = 1; }
+    p = { x: fl.pos.x + (dx / n) * R, z: fl.pos.z + (dz / n) * R };
+  }
+  return p;
+}
+
+// Steering for anything running: away from `from`, out of the beam, away from flares.
+function fleeDir(state, M, from) {
+  const mc = state.cfg.monster;
+  let ax = M.pos.x - from.x, az = M.pos.z - from.z;
+  let n = Math.hypot(ax, az) || 1;
+  ax /= n; az /= n;
+  const P = state.player;
+  if (inBeam(state, M.pos) || (P.flashlightOn && Math.abs(beamOffset(state, M.pos)) < state.cfg.flashlight.beamHalfAngle * 1.6 && dist(P.pos, M.pos) < state.cfg.flashlight.beamRange)) {
+    // veer toward the nearer edge of the beam
+    const side = beamOffset(state, M.pos) >= 0 ? 1 : -1;
+    const lat = forward(bearingTo(P.pos, M.pos) + side * Math.PI / 2);
+    ax += lat.x * mc.fleeBeamSteer; az += lat.z * mc.fleeBeamSteer;
+  }
+  for (const fl of state.flares) {
+    if (fl.state !== 'burning') continue;
+    const d = dist(fl.pos, M.pos), R = state.cfg.flares.radius + 2;
+    if (d < R) {
+      const k = mc.fleeFlareSteer * (1 - d / R) * 2;
+      ax += ((M.pos.x - fl.pos.x) / (d || 1)) * k; az += ((M.pos.z - fl.pos.z) / (d || 1)) * k;
+    }
+  }
+  n = Math.hypot(ax, az) || 1;
+  return { x: ax / n, z: az / n };
+}
+
+// Walked out into the dark? The nearest of the crowd come for you, fast.
+export function stepDeepDark(state) {
+  if (!inDeepDark(state)) return;
+  const { player: P, cfg } = state;
+  const mc = cfg.monster;
+  let deep = 0;
+  for (const m of state.monsters) if (m.deep && ATTACKING.has(m.mode)) deep++;
+  if (deep >= mc.deepDarkPack) return;
+  const cands = state.monsters
+    .filter((m) => !ATTACKING.has(m.mode) && m.mode !== MODES.GONE && dist(m.pos, P.pos) <= mc.deepDarkRange && !inFlare(state, m.pos))
+    .sort((a, b) => dist(a.pos, P.pos) - dist(b.pos, P.pos));
+  for (const m of cands.slice(0, mc.deepDarkPack - deep)) beginWarn(state, m, true);
 }
 
 export function stepMonster(state, M, dt) {
   const { player: P, cfg, rng } = state;
   const mc = cfg.monster;
   const beamed = inBeam(state, M.pos);
-  const deepNow = inDeepDark(state);
-
-  // beam bookkeeping + scramble out of the beam
-  M.dodgeCd = Math.max(0, M.dodgeCd - dt);
   M.beamTime = beamed ? M.beamTime + dt : 0;
   if (beamed) M.beamAccum += dt;
   else M.beamAccum = Math.max(0, M.beamAccum - mc.beamDecay * dt);
-  const canDodge = M.mode === MODES.COMMIT; // only scrambles when it's coming for you — stalkers just get chased off
-  if (beamed && canDodge && M.dodgeT <= 0 && M.dodgeCd <= 0 && M.beamTime >= mc.dodgeReaction) {
-    if (rng.chance(mc.dodgeChance)) {
-      const away = bearingTo(P.pos, M.pos);
-      const side = rng.chance(0.5) ? 1 : -1;
-      // sideways out of the beam — and, when it's hunting you, forward too
-      const angle = M.mode === MODES.COMMIT ? away + side * (Math.PI / 2 + mc.dodgeForwardAngle) : away + side * Math.PI / 2;
-      const perp = forward(angle);
-      M.dodgeVel = { x: perp.x * mc.dodgeSpeed, z: perp.z * mc.dodgeSpeed };
-      M.dodgeT = mc.dodgeTime;
-      M.dodgeCd = mc.dodgeCooldown;
-      emit(state, 'dodge', { id: M.id, pos: { ...M.pos } });
-    } else {
-      M.dodgeCd = mc.dodgeCooldown * 0.5;
-    }
-  }
-  if (M.dodgeT > 0) {
-    M.dodgeT -= dt;
-    M.pos.x += M.dodgeVel.x * dt;
-    M.pos.z += M.dodgeVel.z * dt;
-    pushOutOfCar(cfg, M.pos, 0.4);
-    if (M.mode === MODES.COMMIT) M.commitTime += dt;
-    return;
-  }
+  const lit = M.beamTime >= mc.fleeReaction;
+  if (M.deep && !inDeepDark(state) && M.mode === MODES.COMMIT) M.deep = false; // you made it back: normal rules
 
   switch (M.mode) {
-    case MODES.STALK: {
-      if (deepNow) {
-        // no lull, no circling: out in the dark it's already right there
-        const b = bearingTo(P.pos, M.pos);
-        const f = forward(b);
-        M.pos = { x: P.pos.x + f.x * mc.deepDarkStrikeDist, z: P.pos.z + f.z * mc.deepDarkStrikeDist };
-        M.bearing = b;
-        beginWarn(state, M, true);
+    case MODES.SHAMBLE: {
+      if (M.scatterT > 0) {
+        M.scatterT -= dt;
+        M.pos.x += M.scatterVel.x * dt; M.pos.z += M.scatterVel.z * dt;
         break;
       }
+      const flare = inFlare(state, M.pos, 0.5);
+      if (lit || flare) { scatter(state, M, flare ? flare.pos : P.pos); break; }
+      const h = cfg.horde;
+      M.wanderT -= dt;
+      if (M.wanderT <= 0 || dist(M.pos, M.wander) < 0.3) {
+        const b = M.home + rng.range(-0.35, 0.35);
+        const r = rng.range(h.crowdInner, h.crowdOuter);
+        M.wander = outsideFlares(state, { x: Math.sin(b) * r, z: Math.cos(b) * r }, 1);
+        M.wanderT = rng.range(4, 12);
+      }
+      moveToward(M.pos, M.wander, h.shambleSpeed * dt);
+      break;
+    }
+
+    case MODES.STALK: {
+      if (lit || inFlare(state, M.pos)) { spotted(state, M); break; }
       const diff = wrapAngle(M.targetBearing - M.bearing);
       const stepA = Math.sign(diff) * Math.min(Math.abs(diff), mc.orbitSpeed * dt);
       M.bearing = wrapAngle(M.bearing + stepA);
-      const goal = placeAround(state, M.bearing, stalkDistance(state, M.bearing));
-      const moved = moveToward(M.pos, goal, mc.retreatSpeed * dt) > 0.05 || Math.abs(stepA) > 1e-4;
+      const goal = stalkPoint(state, M.bearing);
+      const moved = moveToward(M.pos, goal, mc.fleeSpeed * 0.8 * dt) > 0.05 || Math.abs(stepA) > 1e-4;
+      pushOutOfCar(cfg, M.pos, 0.4);
       footsteps(state, M, dt, moved);
-      if (inFlare(state, M.pos) || M.beamAccum >= mc.spotRepelTime) { spotted(state, M); break; }
 
       if (M.pendingAction) {
         if (Math.abs(wrapAngle(M.targetBearing - M.bearing)) < 0.12) {
           if (M.pendingAction === 'attack') {
-            if (attackerCount(state) < attackerCap(state)) beginWarn(state, M, false);
-            else toStalk(state, M, rng.range(1, 3)); // wait its turn
+            // no attacking into a flare's light: while you stand in one, they wait at its edge
+            if (!inFlare(state, P.pos, 1) && attackerCount(state) < attackerCap(state)) beginWarn(state, M, false);
+            else toStalk(state, M, rng.range(1, 3));
           } else beginProbe(state, M);
         }
       } else {
@@ -94,41 +128,36 @@ export function stepMonster(state, M, dt) {
     }
 
     case MODES.PROBE: {
+      if (lit || inFlare(state, M.pos)) { spotted(state, M); break; }
       M.timer -= dt;
       const inT = M.timer > mc.probeTime / 2;
-      const edge = Math.max(2.5, stalkDistance(state, M.bearing) - (inT ? 4 : 0));
-      const goal = placeAround(state, M.bearing, edge);
+      const goal = stalkPoint(state, M.bearing, Math.max(2.5, mc.stalkMinDist - (inT ? 4 : 0)));
       moveToward(M.pos, goal, (inT ? 5 : 7) * dt);
       pushOutOfCar(cfg, M.pos, 0.4);
       footsteps(state, M, dt, true);
-      if (inFlare(state, M.pos) || M.beamAccum >= mc.spotRepelTime) { spotted(state, M); break; }
       if (M.timer <= 0) toStalk(state, M, rng.range(mc.lullMin, mc.lullMax));
       break;
     }
 
     case MODES.WARN: {
+      if (!M.deep && (lit || inFlare(state, M.pos))) { repel(state, M); break; }
       M.timer -= dt;
       if (M.timer <= 0) {
         M.mode = MODES.COMMIT;
         M.commitTime = 0;
         M.beamAccum = 0;
-        emit(state, 'lunge', { id: M.id, attack: M.attackId, pos: { ...M.pos } });
+        emit(state, 'lunge', { id: M.id, attack: M.attackId, pos: { ...M.pos }, deep: M.deep });
       }
       break;
     }
 
     case MODES.COMMIT: {
       M.commitTime += dt;
-      const deep = deepNow;
-      let speed = len(M.pos) <= cfg.arena.lightRadius ? mc.commitSpeedLight : mc.commitSpeedDark;
-      if (deep) speed *= mc.deepDarkSpeedMult;
-      if (beamed) speed *= deep ? mc.deepDarkBeamSlow : mc.beamSlow;
-      if (M.beamAccum >= mc.repelTime && (!deep || mc.deepDarkCanRepel)) {
-        emit(state, 'repel', { id: M.id, attack: M.attackId, pos: { ...M.pos } });
-        toRetreat(state, M);
-        break;
-      }
+      const d = dist(M.pos, P.pos);
       if (inFlare(state, M.pos)) { spotted(state, M); break; }
+      if (!M.deep && lit && d > mc.closeCharge) { repel(state, M); break; }
+      let speed = inDimArea(state, M.pos) ? mc.commitSpeedLight : mc.commitSpeedDark;
+      if (M.deep) speed *= mc.deepDarkSpeedMult;
       if (inViewGeometry(state, M.pos) && isLit(state, M.pos)) M.attackSeen = true;
       const remaining = moveToward(M.pos, P.pos, speed * dt);
       pushOutOfCar(cfg, M.pos, 0.4);
@@ -142,7 +171,7 @@ export function stepMonster(state, M, dt) {
       } else if (remaining <= mc.hitRange) {
         if (P.invuln <= 0) hitPlayer(state, M);
         toRetreat(state, M);
-      } else if (M.commitTime > mc.commitTimeout && !deep) {
+      } else if (M.commitTime > mc.commitTimeout && !M.deep) {
         emit(state, 'give_up', { id: M.id, attack: M.attackId });
         toRetreat(state, M);
       }
@@ -151,11 +180,7 @@ export function stepMonster(state, M, dt) {
 
     case MODES.CLIMB: {
       M.climbT -= dt;
-      if (M.beamAccum >= mc.repelTime) {
-        emit(state, 'repel', { id: M.id, attack: M.attackId, pos: { ...M.pos } });
-        toRetreat(state, M);
-        break;
-      }
+      if (M.beamAccum >= mc.spotRepelTime) { repel(state, M); break; }
       if (M.climbT <= 0) {
         if (P.onCar && dist(M.pos, P.pos) <= mc.climbReach + 0.6 && P.invuln <= 0) {
           hitPlayer(state, M);
@@ -168,20 +193,27 @@ export function stepMonster(state, M, dt) {
     }
 
     case MODES.RETREAT: {
-      const away = bearingTo(P.pos, M.pos);
-      const goal = placeAround(state, away, deepNow ? mc.deepDarkStrikeDist : Math.max(mc.retreatDist, stalkDistance(state, away)));
-      const rem = moveToward(M.pos, goal, mc.retreatSpeed * dt);
+      const from = M.fleeFrom || P.pos;
+      const dir = fleeDir(state, M, from);
+      M.pos.x += dir.x * mc.fleeSpeed * dt; M.pos.z += dir.z * mc.fleeSpeed * dt;
       pushOutOfCar(cfg, M.pos, 0.4);
       footsteps(state, M, dt, true);
-      if (rem < 0.2) {
-        M.bearing = away;
-        M.targetBearing = away;
-        if (deepNow) toStalk(state, M, mc.deepDarkReturnDelay);
-        else if (rng.chance(mc.doubleTapChance)) {
-          toStalk(state, M, rng.range(mc.doubleTapDelayMin, mc.doubleTapDelayMax));
+      M.timer -= dt;
+      const outInDark = M.timer < 5.2 && len(M.pos) >= cfg.horde.crowdInner && !beamed && !inFlare(state, M.pos, 1);
+      if (outInDark || M.timer <= 0) {
+        if (M.fleeTap && !inDeepDark(state)) {
+          M.bearing = M.targetBearing = bearingTo(P.pos, M.pos);
+          toStalk(state, M, rng.range(0.6, 1.3));
           emit(state, 'double_tap_armed', { id: M.id });
-        } else toStalk(state, M, rng.range(mc.lullMin, mc.lullMax));
+        } else toShamble(state, M);
       }
+      break;
+    }
+
+    case MODES.GONE: {
+      const dir = fleeDir(state, M, { x: 0, z: 0 });
+      M.pos.x += dir.x * mc.fleeSpeed * 0.8 * dt; M.pos.z += dir.z * mc.fleeSpeed * 0.8 * dt;
+      pushOutOfCar(cfg, M.pos, 0.4);
       break;
     }
   }
@@ -196,22 +228,81 @@ export function footsteps(state, M, dt, moving) {
   }
 }
 
+// A shambler caught in the light (or a flare, or near a bullet impact) scatters: a quick run away and sideways.
+export function scatter(state, M, from) {
+  const { cfg, rng } = state;
+  const mc = cfg.monster;
+  const away = bearingTo(from, M.pos) + rng.range(-0.7, 0.7);
+  let f = forward(away);
+  const tmp = { pos: M.pos };
+  const d = fleeDir(state, tmp, from); // prefers leaving the beam sideways
+  f = { x: (f.x + d.x) / 2, z: (f.z + d.z) / 2 };
+  const n = Math.hypot(f.x, f.z) || 1;
+  M.scatterVel = { x: (f.x / n) * mc.scatterSpeed, z: (f.z / n) * mc.scatterSpeed };
+  M.scatterT = mc.scatterTime * rng.range(0.8, 1.3);
+  M.wanderT = 0;
+  emit(state, 'scatter', { id: M.id, pos: { ...M.pos } });
+}
+
+export function toShamble(state, M) {
+  M.mode = MODES.SHAMBLE;
+  M.deep = false;
+  M.home = Math.atan2(M.pos.x, M.pos.z);
+  M.wanderT = 0;
+  M.pendingAction = null;
+  M.fleeFrom = null;
+}
+
 export function toStalk(state, M, lull) {
   M.mode = MODES.STALK;
+  M.deep = false;
   M.timer = lull;
   M.pendingAction = null;
   M.beamAccum = 0;
+  M.fleeFrom = null;
 }
 
-export function toRetreat(state, M) {
+// Run for the dark. `from` is what it's running from (default: you).
+export function toRetreat(state, M, from = null) {
   M.mode = MODES.RETREAT;
-  M.dodgeT = 0;
+  M.fleeFrom = from ? { ...from } : null;
+  M.fleeTap = state.rng.chance(state.cfg.monster.doubleTapChance);
+  M.timer = 6;
+  M.scatterT = 0;
   emit(state, 'retreat', { id: M.id });
+}
+
+export function repel(state, M) {
+  emit(state, 'repel', { id: M.id, attack: M.attackId, pos: { ...M.pos } });
+  toRetreat(state, M);
 }
 
 export function spotted(state, M) {
   emit(state, 'spotted', { id: M.id, pos: { ...M.pos }, from: M.mode });
   toRetreat(state, M);
+}
+
+// Shot: the first hit makes it bleed and run; the second, it leaves the field for good.
+export function woundMonster(state, M) {
+  M.wounds++;
+  if (M.wounds >= 2) {
+    M.mode = MODES.GONE;
+    M.deep = false;
+    emit(state, 'fled_for_good', { id: M.id, pos: { ...M.pos } });
+  } else {
+    emit(state, 'wounded', { id: M.id, pos: { ...M.pos } });
+    toRetreat(state, M);
+  }
+}
+
+// Everything near where a bullet lands runs from that spot.
+export function bulletScare(state, at, exceptId) {
+  const r = state.cfg.monster.impactRadius;
+  for (const m of state.monsters) {
+    if (m.id === exceptId || m.mode === MODES.GONE || m.deep || dist(m.pos, at) > r) continue;
+    if (m.mode === MODES.SHAMBLE) scatter(state, m, at);
+    else if (m.mode !== MODES.RETREAT) toRetreat(state, m, at);
+  }
 }
 
 export function chooseNext(state, M) {
@@ -246,6 +337,7 @@ export function beginWarn(state, M, deep) {
   M.attackId = ++state.attackId;
   M.attackSeen = false;
   M.deep = deep;
+  M.scatterT = 0;
   M.approachRel = wrapAngle(bearingTo(P.pos, M.pos) - P.yaw);
   emit(state, 'warn', {
     id: M.id,

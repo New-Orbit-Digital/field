@@ -7,7 +7,7 @@ export function spotUsable(state, name) {
   const { player: P, cfg, radio } = state;
   if (name === 'radio') return radio.phase === 'repair' || radio.phase === 'call';
   if (name === 'ammo') return P.reserve < cfg.pistol.maxReserve;
-  if (name === 'flares') return P.flares < cfg.flares.carryMax && state.carFlares > 0;
+  if (name === 'flares') return P.flares < cfg.flares.carryMax && state.carFlares > 0 && state.t >= state.flareReadyAt;
   return false;
 }
 
@@ -42,7 +42,8 @@ export function doInteract(state, name, dt) {
   }
   if (name === 'flares' && P.hold >= cfg.flares.pickupTime) {
     P.flares++; state.carFlares--; P.hold = 0;
-    emit(state, 'flare_pickup', { left: state.carFlares });
+    state.flareReadyAt = state.t + cfg.flares.restockTime;
+    emit(state, 'flare_pickup', {});
   }
 }
 

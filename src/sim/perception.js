@@ -1,4 +1,5 @@
-// What can be seen and lit: view cone, flashlight beam (with recoil waver), flares, the deep dark.
+// What can be seen and lit: view cone, flashlight beam (with recoil waver), flares, the dim play area, the deep dark.
+// There's no circle of light at the wreck any more: the far headlights and the strobes only light it dimly.
 import { bearingTo, dist, len, wrapAngle } from './math.js';
 
 export function inViewGeometry(state, pos) {
@@ -25,13 +26,23 @@ export function inBeam(state, pos) {
   return rel <= cfg.flashlight.beamHalfAngle;
 }
 
+// Signed angle from the beam's centre line to pos (for steering out of it).
+export function beamOffset(state, pos) {
+  return wrapAngle(bearingTo(state.player.pos, pos) - aimYaw(state));
+}
+
 export function inFlare(state, pos, pad = 0) {
   for (const f of state.flares) if (f.state === 'burning' && dist(f.pos, pos) < state.cfg.flares.radius + pad) return f;
   return null;
 }
 
+// Dimly lit by the headlights on the embankment (enough to make out a shape).
+export function inDimArea(state, pos) {
+  return len(pos) <= state.cfg.arena.darkRadius;
+}
+
 export function isLit(state, pos) {
-  return len(pos) <= state.cfg.arena.lightRadius || inBeam(state, pos) || !!inFlare(state, pos);
+  return inDimArea(state, pos) || inBeam(state, pos) || !!inFlare(state, pos);
 }
 
 export function monsterVisible(state, m) {
@@ -39,5 +50,5 @@ export function monsterVisible(state, m) {
 }
 
 export function inDeepDark(state) {
-  return len(state.player.pos) > state.cfg.arena.lightRadius + state.cfg.monster.deepDarkMargin;
+  return len(state.player.pos) > state.cfg.arena.darkRadius;
 }

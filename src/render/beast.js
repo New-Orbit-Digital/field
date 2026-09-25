@@ -1,7 +1,7 @@
 // The monster model + animation: a spindly four-legged thing. Smooth, deliberate movement;
 // the wrongness is in the proportions, the long gait, and one slow head tilt.
 import * as THREE from 'three';
-import { MODES } from '../sim/game.js';
+import { MODES, inBeam } from '../sim/game.js';
 
 export function buildBeast() {
   const skin = new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 1 });
@@ -64,15 +64,18 @@ export function buildBeast() {
     vis: new THREE.Vector3(),
     gait: 0, yaw: 0,
     flinch: 0,
+    bleed: 0,
     tiltT: 2 + Math.random() * 4, tilt: 0, tiltTarget: 0, // occasional slow head tilt — the one 'wrong' movement
   };
 }
 
-export function animateBeast(v, m, P, t, dt) {
+export function animateBeast(v, m, state, dt) {
+  const P = state.player, t = state.t;
   const mode = m.mode;
-  const fast = mode === MODES.COMMIT || mode === MODES.RETREAT || m.dodgeT > 0;
+  const scattering = m.scatterT > 0;
+  const fast = mode === MODES.COMMIT || mode === MODES.RETREAT || mode === MODES.GONE || scattering;
   // smooth follow of the sim position (no stop-motion snapping)
-  const k = 1 - Math.exp(-dt * (m.dodgeT > 0 ? 30 : 18));
+  const k = 1 - Math.exp(-dt * 18);
   const px = v.vis.x, pz = v.vis.z;
   v.vis.x += (m.pos.x - v.vis.x) * k;
   v.vis.z += (m.pos.z - v.vis.z) * k;
@@ -82,7 +85,7 @@ export function animateBeast(v, m, P, t, dt) {
   // face travel direction; face the player when warning / climbing
   let want = v.yaw;
   if (mode === MODES.WARN || mode === MODES.CLIMB || mode === MODES.PROBE) want = Math.atan2(P.pos.x - m.pos.x, P.pos.z - m.pos.z);
-  else if (moved > 0.002 && m.dodgeT <= 0) want = Math.atan2(dx, dz);
+  else if (moved > 0.002) want = Math.atan2(dx, dz);
   let dy = want - v.yaw;
   dy = Math.atan2(Math.sin(dy), Math.cos(dy));
   v.yaw += dy * (1 - Math.exp(-dt * 8));
@@ -104,6 +107,7 @@ export function animateBeast(v, m, P, t, dt) {
   else if (mode === MODES.COMMIT) { crouch = -0.15; pitch = 0.18; }
   else if (mode === MODES.CLIMB) { crouch = 0.3; pitch = -0.7; }
   else if (mode === MODES.PROBE) { crouch = -0.1; pitch = 0.1; }
+  else if (mode === MODES.SHAMBLE && !scattering) { crouch = -0.08; pitch = 0.16 + Math.sin(t * 0.7 + v.tiltT) * 0.05; } // head hung, swaying
   v.body.position.y += (crouch - v.body.position.y) * Math.min(1, dt * 8);
   v.body.rotation.x += (pitch - v.body.rotation.x) * Math.min(1, dt * 8);
   v.flinch = Math.max(0, v.flinch - dt);
@@ -112,14 +116,15 @@ export function animateBeast(v, m, P, t, dt) {
   // the one unsettling tic: now and then, while it's still, the head slowly tilts too far, then snaps back
   v.tiltT -= dt;
   if (v.tiltT <= 0) {
-    if (v.tiltTarget === 0 && (mode === MODES.STALK || mode === MODES.PROBE)) { v.tiltTarget = (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 0.4); v.tiltT = 1.2 + Math.random(); }
+    if (v.tiltTarget === 0 && (mode === MODES.STALK || mode === MODES.PROBE || mode === MODES.SHAMBLE)) { v.tiltTarget = (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 0.4); v.tiltT = 1.2 + Math.random(); }
     else { v.tiltTarget = 0; v.tiltT = 3 + Math.random() * 5; v.tilt = 0; } // snap back
   }
   v.tilt += (v.tiltTarget - v.tilt) * Math.min(1, dt * 1.5);
-  const look = mode === MODES.WARN ? -0.3 : 0;
+  const look = mode === MODES.WARN ? -0.3 : mode === MODES.SHAMBLE ? 0.35 : 0;
   v.neck.rotation.set(look, 0, 0);
   v.head.rotation.set(0, 0, v.tilt);
   v.spine.forEach((n, i) => { n.rotation.x = Math.sin(g * 4 + i) * (fast ? 0.15 : 0.06); });
-  const eyes = mode === MODES.WARN || mode === MODES.COMMIT || mode === MODES.CLIMB ? 1 : mode === MODES.PROBE ? 0.35 : 0;
+  // eyes: lit when it's coming for you, and they shine back when your beam catches them
+  const eyes = inBeam(state, m.pos) ? 1 : mode === MODES.WARN || mode === MODES.COMMIT || mode === MODES.CLIMB ? 1 : mode === MODES.PROBE ? 0.35 : 0;
   v.eyeMat.opacity += (eyes - v.eyeMat.opacity) * Math.min(1, dt * 10);
 }

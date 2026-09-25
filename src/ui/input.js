@@ -1,7 +1,7 @@
 // Keyboard + mouse. Held controls are read each sim tick; one-shot actions (fire, reload, throw, jump)
 // are queued as "edges" and consumed by the next tick.
 //   WASD/arrows move · mouse look · hold right click = flashlight · left click = fire
-//   R reload · Q throw flare · Space jump · hold E use the car · ` debug
+//   R reload · Q drop flare · Space jump · hold E use the car · ` debug
 const EDGE_KEYS = { KeyR: 'reload', KeyQ: 'throw', Space: 'jump' };
 
 export function createInput(canvas, { isPlaying, onLook, onDebug, onKey }) {

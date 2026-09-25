@@ -1,7 +1,7 @@
 // Scripted players for headless testing and the phone demo. Not used by the game itself.
 // Bots hear warnings (like a player with headphones), react after a delay, and turn at a
-// limited rate — they don't get to snap-aim, so the monster's dodge actually matters.
-import { bearingTo, wrapAngle, spotWorld, MODES } from './game.js';
+// limited rate — they don't get to snap-aim.
+import { bearingTo, wrapAngle, spotWorld, inFlare, worldToCar, carToWorld, MODES } from './game.js';
 
 function lcg(seed) {
   let s = seed >>> 0;
@@ -13,9 +13,22 @@ function turnToward(cur, target, rate, dt) {
   return wrapAngle(cur + Math.sign(d) * Math.min(Math.abs(d), rate * dt));
 }
 
+// Around the wreck rather than into it: if the target is on the other long side, go via the nearer end.
+function waypoint(s, to) {
+  const cfg = s.cfg;
+  const a = worldToCar(cfg, s.player.pos), b = worldToCar(cfg, to);
+  const hz = cfg.car.halfWidth, hx = cfg.car.halfLength;
+  const blocked = a.z * b.z < 0 && (Math.abs(a.x) < hx + 0.6 || Math.abs(b.x) < hx + 0.6);
+  if (!blocked || Math.abs(a.z) < 0.1) return to;
+  const ex = (a.x + b.x >= 0 ? 1 : -1) * (hx + 1.1);
+  if (Math.abs(a.x) < hx + 0.6) return carToWorld(cfg, { x: ex, z: Math.sign(a.z) * (hz + 0.9) });
+  return carToWorld(cfg, { x: ex, z: Math.sign(b.z) * (hz + 0.9) });
+}
+
 // Local move input that walks toward a world point regardless of facing.
 function moveTo(s, to) {
   const P = s.player;
+  to = waypoint(s, to);
   const b = bearingTo(P.pos, to);
   const d = { x: Math.sin(b), z: Math.cos(b) };
   const f = { x: Math.sin(P.yaw), z: Math.cos(P.yaw) };
@@ -81,7 +94,7 @@ export function reactiveBot({ reaction = 0.35, missChance = 0, scanRate = 0.6, t
 }
 
 // Plays the objective: repair and call on the radio, fetch ammo, defend with light + gun.
-export function objectiveBot({ reaction = 0.4, missChance = 0.1, turnRate = 6, aimNoise = 0.03, seed = 777, flares = true } = {}) {
+export function objectiveBot({ reaction = 0.4, missChance = 0.1, turnRate = 6, aimNoise = 0.03, seed = 777, flares = true, flareMargin = 3 } = {}) {
   const T = threatTracker({ reaction, missChance, seed });
   let lastFire = 0;
   return (s, events, dt = 1 / 60) => {
@@ -103,24 +116,44 @@ export function objectiveBot({ reaction = 0.4, missChance = 0.1, turnRate = 6, a
     // calm moment: housekeeping
     if (P.reloading > 0) return out;
     if (P.mag === 0 && P.reserve > 0) { out.reload = true; return out; }
-    if (flares && P.flares > 0 && s.monsters.length >= 3) { out.throw = true; }
+
+    const walkTo = (to, face) => {
+      const d = Math.hypot(to.x - P.pos.x, to.z - P.pos.z);
+      if (d > 0.5) {
+        const mv = moveTo(s, to);
+        out.moveX = mv.moveX; out.moveZ = mv.moveZ;
+        out.yaw = turnToward(P.yaw, bearingTo(P.pos, waypoint(s, to)), turnRate, dt);
+        return false;
+      }
+      if (face) out.yaw = turnToward(P.yaw, bearingTo(P.pos, face), turnRate, dt);
+      return true;
+    };
+    // a flare that will keep lighting `pos` for a few more seconds?
+    const covered = (pos) => { const f = inFlare(s, pos); return f && f.burn - f.t > flareMargin; };
 
     let goal = null;
     if (P.mag + P.reserve < 6) goal = 'ammo';
-    else if (flares && P.flares === 0 && s.carFlares > 0 && s.monsters.length >= 3) goal = 'flares';
     else if (s.radio.phase === 'repair' || s.radio.phase === 'call') goal = 'radio';
+
+    if (flares && goal !== 'ammo') {
+      // keep a flare burning where we're working (or waiting)
+      const here = goal === 'radio' ? spotWorld(cfg, 'radio').stand : spotWorld(cfg, 'flares').stand;
+      if (!covered(here)) {
+        if (P.flares > 0) {
+          if (walkTo(here)) out.throw = true;
+          return out;
+        }
+        if (s.t >= s.flareReadyAt) {
+          const sp = spotWorld(cfg, 'flares');
+          if (walkTo(sp.stand, sp.face)) out.interact = true;
+          return out;
+        }
+      }
+    }
 
     if (goal) {
       const sp = spotWorld(cfg, goal);
-      const d = Math.hypot(sp.stand.x - P.pos.x, sp.stand.z - P.pos.z);
-      if (d > 0.5) {
-        const mv = moveTo(s, sp.stand);
-        out.moveX = mv.moveX; out.moveZ = mv.moveZ;
-        out.yaw = turnToward(P.yaw, bearingTo(P.pos, sp.stand), turnRate, dt);
-      } else {
-        out.yaw = turnToward(P.yaw, bearingTo(P.pos, sp.face), turnRate, dt);
-        out.interact = true;
-      }
+      if (walkTo(sp.stand, sp.face)) out.interact = true;
       return out;
     }
     // waiting for rescue: stand near the car and scan

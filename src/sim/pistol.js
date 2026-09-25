@@ -1,7 +1,8 @@
 // Pistol: firing (with recoil), reloading, and the active 'perfect reload' window.
 import { emit } from './events.js';
-import { bearingTo, dist, wrapAngle } from './math.js';
-import { toRetreat } from './monster.js';
+import { bearingTo, dist, forward, wrapAngle } from './math.js';
+import { bulletScare, woundMonster } from './monster.js';
+import { MODES } from './modes.js';
 import { aimYaw } from './perception.js';
 
 export function reloadProgress(P) {
@@ -36,6 +37,7 @@ export function fire(state) {
   P.recoilPhase = state.rng.range(0, Math.PI * 2);
   let best = null, bestD = Infinity;
   for (const m of state.monsters) {
+    if (m.mode === MODES.GONE) continue;
     const d = dist(P.pos, m.pos);
     if (d > cfg.pistol.range || d < 0.01) continue;
     const tol = cfg.pistol.aimTolerance + Math.atan(cfg.pistol.bodyRadius / d);
@@ -43,10 +45,15 @@ export function fire(state) {
     if (rel <= tol && d < bestD) { best = m; bestD = d; }
   }
   emit(state, 'shot', { hit: best ? best.id : null, mag: P.mag });
+  // where the bullet ends up: in the monster, or in the snow further out
+  const f = forward(aim);
+  const at = best ? { ...best.pos } : { x: P.pos.x + f.x * cfg.monster.impactDist, z: P.pos.z + f.z * cfg.monster.impactDist };
+  emit(state, 'bullet_impact', { pos: at, hit: best ? best.id : null });
   if (best) {
-    emit(state, 'shot_hit', { id: best.id, pos: { ...best.pos }, attack: best.attackId });
-    toRetreat(state, best);
+    emit(state, 'shot_hit', { id: best.id, pos: { ...best.pos }, attack: best.attackId, wounds: best.wounds + 1 });
+    woundMonster(state, best);
   }
+  bulletScare(state, at, best ? best.id : null);
 }
 
 // Recoil settles; reload advances (or a perfect/jam attempt resolves); or a reload starts.

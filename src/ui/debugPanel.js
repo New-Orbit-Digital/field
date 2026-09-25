@@ -1,5 +1,5 @@
 // Debug overlay (toggle with `): per-monster state readout and a player-centred minimap.
-import { bearingTo, inDeepDark, monsterVisible, spotWorld, attackerCap, wrapAngle } from '../sim/game.js';
+import { bearingTo, inDeepDark, monsterVisible, spotWorld, attackerCap, hunterCount, wrapAngle } from '../sim/game.js';
 import { $ } from './dom.js';
 
 let mctx = null;
@@ -8,12 +8,13 @@ export function renderDebug(game, seed) {
   const P = game.player, cfg = game.cfg;
   const lines = [
     `seed ${seed}   t ${game.t.toFixed(1)}s   phase ${game.radio.phase}   deep ${inDeepDark(game)}`,
-    `monsters ${game.monsters.length}/${cfg.horde.max}   attacker cap ${attackerCap(game)}   flares burning ${game.flares.length}`,
+    `crowd ${game.monsters.length}/${cfg.horde.crowd}   hunting ${hunterCount(game)}/${game.hordeTarget}   attacker cap ${attackerCap(game)}   flares burning ${game.flares.length}   next flare ${Math.max(0, game.flareReadyAt - game.t).toFixed(0)}s`,
     `battery ${P.battery.toFixed(0)}  hp ${P.health}  mag ${P.mag}/${P.reserve}  y ${P.y.toFixed(2)}  onCar ${P.onCar}  spot ${P.activeSpot || '-'}`,
   ];
   for (const m of game.monsters) {
+    if (m.mode === 'shamble') continue;
     const rel = wrapAngle(bearingTo(P.pos, m.pos) - P.yaw);
-    lines.push(`#${m.id} ${m.mode.padEnd(7)} rel ${(rel * 180 / Math.PI).toFixed(0).padStart(4)}°  d ${Math.hypot(m.pos.x - P.pos.x, m.pos.z - P.pos.z).toFixed(1).padStart(5)}  vis ${monsterVisible(game, m) ? 'Y' : '-'}  beam ${m.beamAccum.toFixed(2)}${m.dodgeT > 0 ? ' DODGE' : ''}`);
+    lines.push(`#${m.id} ${m.mode.padEnd(7)} rel ${(rel * 180 / Math.PI).toFixed(0).padStart(4)}°  d ${Math.hypot(m.pos.x - P.pos.x, m.pos.z - P.pos.z).toFixed(1).padStart(5)}  vis ${monsterVisible(game, m) ? 'Y' : '-'}  beam ${m.beamAccum.toFixed(2)}${m.wounds ? ' W' + m.wounds : ''}${m.deep ? ' DEEP' : ''}`);
   }
   $('debugText').textContent = lines.join('\n');
 
@@ -29,10 +30,11 @@ export function renderDebug(game, seed) {
   mctx.fillStyle = 'rgba(0,0,0,0.65)';
   mctx.fillRect(0, 0, W, W);
   const [cx, cy] = toMap({ x: 0, z: 0 });
-  mctx.strokeStyle = '#3f8'; mctx.lineWidth = 1;
-  mctx.beginPath(); mctx.arc(cx, cy, cfg.arena.lightRadius * S, 0, Math.PI * 2); mctx.stroke();
+  mctx.lineWidth = 1;
   mctx.strokeStyle = '#f35';
-  mctx.beginPath(); mctx.arc(cx, cy, (cfg.arena.lightRadius + cfg.monster.deepDarkMargin) * S, 0, Math.PI * 2); mctx.stroke();
+  mctx.beginPath(); mctx.arc(cx, cy, cfg.arena.darkRadius * S, 0, Math.PI * 2); mctx.stroke();
+  mctx.strokeStyle = '#555';
+  mctx.beginPath(); mctx.arc(cx, cy, cfg.horde.crowdInner * S, 0, Math.PI * 2); mctx.stroke();
   mctx.fillStyle = '#888';
   mctx.beginPath();
   for (const [lx, lz] of [[1, 1], [1, -1], [-1, -1], [-1, 1]]) {
@@ -57,7 +59,7 @@ export function renderDebug(game, seed) {
   mctx.arc(W / 2, W / 2, 16 * S, -Math.PI / 2 - h, -Math.PI / 2 + h); mctx.fill();
   mctx.fillStyle = '#9cf';
   mctx.beginPath(); mctx.arc(W / 2, W / 2, 4, 0, Math.PI * 2); mctx.fill();
-  const colors = { stalk: '#777', probe: '#fc3', warn: '#f80', commit: '#f22', climb: '#f0f', retreat: '#6af' };
+  const colors = { shamble: '#444', stalk: '#999', probe: '#fc3', warn: '#f80', commit: '#f22', climb: '#f0f', retreat: '#6af', gone: '#a33' };
   for (const m of game.monsters) {
     const [mx, my] = toMap(m.pos);
     mctx.fillStyle = colors[m.mode];
