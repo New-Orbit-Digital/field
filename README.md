@@ -1,6 +1,6 @@
 # FIELD
 
-Third-person survival horror experiment. An overturned cop car sits in a snowy field at night, red and blue lights still flashing, hazards blinking. A vehicle up on an embankment shines its headlights down on the wreck. Out past the edge of the light, a crowd of things shambles around in the dark. They hate light. One by one they break off and come for you.
+Third-person survival horror experiment. An overturned cop car sits in a snowy field at night, red and blue lights still flashing, hazards blinking, engine still idling. A vehicle up on an embankment shines its headlights down on the wreck. Your breath clouds in the cold. Out past the edge of the light, a crowd of things shambles around in the dark. They hate light. One by one they break off and come for you.
 
 v1 is three.js in the browser. If the game holds up, it gets remade in Godot.
 
@@ -13,7 +13,7 @@ v1 is three.js in the browser. If the game holds up, it gets remade in Godot.
 
 Goal: fix the radio, call for help, survive until the rescue vehicle arrives. More of them hunt you as the night goes on.
 
-How the light works: the wreck has no light of its own, only strobes and hazards. The far headlights light the area dimly. A flare lights a 9 m circle they won't enter or attack into. One is already burning when the night starts. After that, take one from the passenger side and drop it at your feet with Q. The box never runs out, but the next flare takes 35 s to dig out. Any beam that lands on them sends them running back to the dark, unless one is already within 2 m of you mid-lunge. Shoot one and it bleeds and runs. Shoot it twice and it leaves the field for good. Bullets landing near them scare them off too. Walk out past the dim area and the crowd is right there.
+How the light works: the wreck has no light of its own, only strobes and hazards. The far headlights light the area dimly. A flare lights a 9 m circle they won't enter or attack into; as it gutters out over its last 3 s, the circle shrinks with the light. One is already burning when the night starts. After that, take one from the passenger side and drop it at your feet with Q. The box never runs out, but the next flare takes 35 s to dig out. Any beam that lands on them sends them running back to the dark, unless one is already within 2 m of you mid-lunge. Shoot one and it bleeds and runs. Shoot it twice and it leaves the field for good. Bullets landing near them scare them off too. Walk out past the dim area and the crowd is right there.
 
 Controls: WASD move · mouse look/aim · hold right click flashlight · left click shoot · R reload · hold E at the car (radio / trunk ammo / flares) · Q drop flare · Space jump (push into the car mid-jump to climb) · Esc pause · `` ` `` debug overlay. `?seed=ABC123` replays a specific night; `?demo` runs the scripted player.
 
@@ -47,9 +47,11 @@ src/render/            three.js — reads sim state, never writes it
   carRig.js / car.js   wreck model, red/blue strobes on both sides (shadow-casting), hazards, pickup-spot lights
   playerRig.js / player.js   player model, flashlight, muzzle flash, aim point
   beastPool.js / beast.js    monster views + model/animation, blood trails
-  landmark.js          vehicle on the embankment: headlight glow + the dim shadow-casting spotlight
+  landmark.js          vehicle on the embankment: body, headlights + glare, light shafts, the dim shadow-casting spotlight
   ground.js            terrain, including the embankment (groundHeight is shared)
-  snowMarks.js         painted snow: skid / flip / drag tracks, blood, bullet scuffs
+  snowMarks.js         painted snow: skid / flip / drag tracks, blood, bullet scuffs, footprints
+  tracks.js            lays footprints as you and they move (boots, four-legged prints)
+  puffs.js             vapour: exhaust from both cars, your breath
   impacts.js           snow and blood bursts where bullets land
   flareRig.js · snow.js · followCamera.js · debugRings.js · textures.js
 
@@ -68,7 +70,7 @@ tools/                 build, balance report, headless screenshots, phone demo c
 ## Commands
 | Command | What it does |
 |---|---|
-| `npm test` | 24 headless sim tests: determinism, honest tells, attack spread/timing, fleeing the beam (and the 2 m exception), crowd scatter / nothing freezes in the beam, wounds and leaving for good, bullet scares, car pickups + flare restock, radio → rescue, reload/active reload, recoil, starting flare, dropped flares, jump/mantle/roof, the crowd and hunter cap, battery, deep dark |
+| `npm test` | 25 headless sim tests: determinism, honest tells, attack spread/timing, fleeing the beam (and the 2 m exception), crowd scatter / nothing freezes in the beam, wounds and leaving for good, bullet scares, car pickups + flare restock, radio → rescue, reload/active reload, recoil, starting flare, dropped flares, guttering flares, jump/mantle/roof, the crowd and hunter cap, battery, deep dark |
 | `npm run sim` | Balance report: defence-only survival and objective win rates for scripted players of different skill |
 | `npm run build` | `dist/field.js`, single-file `dist/field.html`, and `dist/field.artifact.html` (for the claude.ai page) |
 | `npm run shots` | Headless Chromium screenshots of posed scenes → `shots/` |
