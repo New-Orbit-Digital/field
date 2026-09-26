@@ -13,13 +13,14 @@ export function renderDebug(game, seed) {
   ];
   const hz = game.hazards;
   const hzBits = [
-    hz.fire && `fire s${hz.fire.stage} fuse ${hz.fire.fuse.toFixed(0)}`,
-    hz.swarm && `swarm ${hz.swarm.count} ${hz.swarm.target}`,
-    hz.tentacles.length && `tentacles ${hz.tentacles.map((t) => t.state[0] + t.alt).join(',')}`,
+    hz.fireArmed && 'fire armed (after the first flare)',
+    hz.fire && `fire ${hz.fire.phase} ${hz.fire.burnT.toFixed(0)}s`,
+    hz.carBlown && 'CAR BLOWN',
+    hz.swarm && `swarm ${hz.swarm.target}`,
+    hz.tentacles.length && `tentacles ${hz.tentacles.map((t) => t.state).join(',')}`,
     hz.cold && `heat ${P.heat.toFixed(0)}${hz.cold.numb ? ' NUMB' : ''}`,
     hz.gust && `gust ${hz.gust.phase}`,
-    hz.statue && `statue ${hz.statue.moving ? 'moving' : 'frozen'}`,
-    hz.crawler && `crawler ${hz.crawler.state}`,
+    hz.zombie && `zombie ${hz.zombie.state}${hz.zombie.state === 'grab' ? ' ' + hz.zombie.alt : ''}`,
     P.held != null && `HELD ${P.held}`,
   ].filter(Boolean);
   if (hzBits.length) lines.push('hazards: ' + hzBits.join('   '));
