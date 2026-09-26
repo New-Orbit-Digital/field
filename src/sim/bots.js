@@ -56,14 +56,15 @@ function threatTracker({ reaction, missChance, seed, trackLag = 0.22 }) {
     },
     update(s, events) {
       for (const e of events) {
-        if (e.type === 'warn' && rand() >= missChance) pending.push({ at: s.t + reaction * (0.8 + rand() * 0.4), id: e.id });
+        // growls before a lunge, and the banging / pawing before a smash or a ram
+        if ((e.type === 'warn' || e.type === 'smash_start' || e.type === 'ram_windup') && rand() >= missChance) pending.push({ at: s.t + reaction * (0.8 + rand() * 0.4), id: e.id });
         if ((e.type === 'repel' || e.type === 'hit' || e.type === 'give_up' || e.type === 'shot_hit' || e.type === 'spotted' || e.type === 'retreat') && e.id === threatId) threatId = null;
       }
       for (let i = pending.length - 1; i >= 0; i--) {
         if (s.t >= pending[i].at) { if (threatId === null) { threatId = pending[i].id; history.length = 0; } pending.splice(i, 1); }
       }
       const m = threatId !== null ? s.monsters.find((x) => x.id === threatId) : null;
-      if (m && m.mode === MODES.RETREAT) { threatId = null; return null; }
+      if (m && (m.mode === MODES.RETREAT || m.mode === MODES.SHAMBLE)) { threatId = null; return null; }
       return m || null;
     },
   };

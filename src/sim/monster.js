@@ -3,7 +3,7 @@
 //   → retreat back to the dark → rejoin the crowd.  Shot twice → gone for good.
 // Light is the rule: any beam that lands on it sends it running (scattering, for the crowd), unless it's
 // already within `closeCharge` of you mid-lunge. It won't enter a flare's circle. It runs from bullet impacts.
-import { pushOutOfCar } from './car.js';
+import { carDirToWorld, carDistance, carToWorld, pushOutOfCar, worldToCar } from './car.js';
 import { MODES, ATTACKING } from './modes.js';
 import { emit } from './events.js';
 import { attackerCap, attackerCount } from './horde.js';
@@ -202,11 +202,80 @@ export function stepMonster(state, M, dt) {
       const outInDark = M.timer < 5.2 && len(M.pos) >= cfg.horde.crowdInner && !beamed && !inFlare(state, M.pos, 1);
       if (outInDark || M.timer <= 0) {
         if (M.fleeTap && !inDeepDark(state)) {
-          M.bearing = M.targetBearing = bearingTo(P.pos, M.pos);
-          toStalk(state, M, rng.range(0.6, 1.3));
+          if (M.kind === 'hunter' || (M.kind === 'breaker' && !state.strobes.some(Boolean))) {
+            M.bearing = M.targetBearing = bearingTo(P.pos, M.pos);
+            toStalk(state, M, rng.range(0.6, 1.3));
+          } else beginApproach(state, M);
           emit(state, 'double_tap_armed', { id: M.id });
         } else toShamble(state, M);
       }
+      break;
+    }
+
+    // ---- breakers and rammers ----
+    case MODES.APPROACH: {
+      const respectsFlares = M.kind !== 'rammer' || !mc.rammersIgnoreFlares;
+      if (lit || (respectsFlares && inFlare(state, M.pos))) { spotted(state, M); break; }
+      if (M.kind === 'breaker' && !state.strobes[M.side > 0 ? 0 : 1]) {
+        // someone already smashed this side: try the other, or give up and hunt
+        if (state.strobes.some(Boolean)) M.side = -M.side;
+        else { toStalk(state, M, rng.range(1, 3)); break; }
+      }
+      let goal = approachGoal(state, M);
+      if (respectsFlares) goal = outsideFlares(state, goal, 1); // waits at the edge of a flare's light
+      const rem = moveToward(M.pos, goal, mc.approachSpeed * dt);
+      pushOutOfCar(cfg, M.pos, 0.4);
+      footsteps(state, M, dt, rem > 0.05);
+      const target = approachGoal(state, M);
+      if (dist(M.pos, target) < 0.35) {
+        if (M.kind === 'breaker') {
+          M.mode = MODES.SMASH; M.timer = mc.smashTime; M.beamAccum = 0;
+          emit(state, 'smash_start', { id: M.id, side: M.side, pos: { ...M.pos } });
+        } else {
+          M.mode = MODES.WINDUP; M.timer = mc.windupTime; M.beamAccum = 0;
+          emit(state, 'ram_windup', { id: M.id, pos: { ...M.pos } });
+        }
+      }
+      break;
+    }
+
+    case MODES.SMASH: {
+      if (lit || inFlare(state, M.pos)) { repel(state, M); break; }
+      M.timer -= dt;
+      if (M.timer <= 0) {
+        const i = M.side > 0 ? 0 : 1;
+        if (state.strobes[i]) {
+          state.strobes[i] = false;
+          emit(state, 'lights_smashed', { id: M.id, side: M.side, pos: { ...M.pos } });
+        }
+        toRetreat(state, M);
+      }
+      break;
+    }
+
+    case MODES.WINDUP: {
+      if (lit) { repel(state, M); break; }
+      M.timer -= dt;
+      if (M.timer <= 0) {
+        M.mode = MODES.RAM; M.timer = 3; M.beamAccum = 0;
+        emit(state, 'ram', { id: M.id, pos: { ...M.pos } });
+      }
+      break;
+    }
+
+    case MODES.RAM: {
+      const hull = carDistance(cfg, M.pos);
+      if (lit && hull > mc.ramCloseCharge) { repel(state, M); break; }
+      M.timer -= dt;
+      const centre = { x: cfg.car.x || 0, z: cfg.car.z || 0 };
+      const dir = { x: centre.x - M.pos.x, z: centre.z - M.pos.z };
+      moveToward(M.pos, centre, mc.ramSpeed * dt);
+      footsteps(state, M, dt, true);
+      if (carDistance(cfg, M.pos) <= 0.45) {
+        shoveCar(state, M, dir);
+        pushOutOfCar(cfg, M.pos, 0.5);
+        toRetreat(state, M);
+      } else if (M.timer <= 0) toRetreat(state, M);
       break;
     }
 
@@ -216,6 +285,76 @@ export function stepMonster(state, M, dt) {
       pushOutOfCar(cfg, M.pos, 0.4);
       break;
     }
+  }
+}
+
+// Where a breaker / rammer is heading: next to the light bar on its side, or its run-up spot round the car.
+export function approachGoal(state, M) {
+  const { cfg } = state;
+  if (M.kind === 'breaker') return carToWorld(cfg, { x: 0, z: M.side * (cfg.car.halfWidth + cfg.monster.smashReach) });
+  const r = cfg.monster.ramStartDist;
+  return carToWorld(cfg, { x: Math.cos(M.ramAngle) * r, z: Math.sin(M.ramAngle) * r });
+}
+
+export function beginApproach(state, M) {
+  const { rng, cfg } = state;
+  M.mode = MODES.APPROACH;
+  M.pendingAction = null;
+  M.beamAccum = 0;
+  M.fleeFrom = null;
+  if (M.kind === 'breaker') {
+    // the nearer side that still has lights
+    const local = worldToCar(cfg, M.pos);
+    const alive = [1, -1].filter((sd) => state.strobes[sd > 0 ? 0 : 1]);
+    M.side = alive.includes(Math.sign(local.z) || 1) ? (Math.sign(local.z) || 1) : alive[0] ?? 1;
+  } else {
+    // come in roughly from where it is, give or take
+    const local = worldToCar(cfg, M.pos);
+    M.ramAngle = Math.atan2(local.z, local.x) + rng.range(-0.6, 0.6);
+  }
+  emit(state, 'approach', { id: M.id, kind: M.kind, pos: { ...M.pos } });
+}
+
+// A rammer hits the car: jostle it, turn it a few degrees, or slide it. Whatever you were doing is interrupted;
+// on the roof you might go over. The car never drifts far from where the night started.
+export function shoveCar(state, M, dir) {
+  const { cfg, rng, player: P } = state;
+  const mc = cfg.monster, car = cfg.car;
+  const n = Math.hypot(dir.x, dir.z) || 1;
+  const d = { x: dir.x / n, z: dir.z / n };
+  const roll = rng.next();
+  let kind, dyaw, slide;
+  if (roll < mc.jostleChance) { kind = 'jostle'; dyaw = rng.range(-mc.jostleTurn, mc.jostleTurn); slide = mc.jostleSlide; }
+  else if (roll < mc.jostleChance + mc.rotateChance) { kind = 'rotate'; dyaw = (rng.chance(0.5) ? 1 : -1) * rng.range(mc.rotateMin, mc.rotateMax); slide = 0.03; }
+  else { kind = 'slide'; dyaw = rng.range(-0.02, 0.02); slide = rng.range(mc.slideMin, mc.slideMax); }
+
+  const before = { x: car.x || 0, z: car.z || 0, yaw: car.yaw };
+  const yaw0 = car.yaw0 ?? (car.yaw0 = car.yaw);
+  // where you stand on the car, in its own frame, so the roof carries you along
+  const carried = P.onCar ? worldToCar(cfg, P.pos) : null;
+  car.yaw = Math.max(yaw0 - car.maxTurn, Math.min(yaw0 + car.maxTurn, car.yaw + dyaw));
+  let nx = before.x + d.x * slide, nz = before.z + d.z * slide;
+  const r = Math.hypot(nx, nz);
+  if (r > car.maxDrift) { nx *= car.maxDrift / r; nz *= car.maxDrift / r; }
+  car.x = nx; car.z = nz;
+  if (carried) P.pos = carToWorld(cfg, carried);
+
+  emit(state, 'car_rammed', { id: M.id, kind, dyaw: +(car.yaw - before.yaw).toFixed(4), dx: +(car.x - before.x).toFixed(3), dz: +(car.z - before.z).toFixed(3), pos: { ...M.pos } });
+
+  if (P.interacting || P.hold > 0) {
+    P.interacting = false; P.hold = 0; P.interactBlock = true;
+    emit(state, 'interrupted');
+  }
+  if (P.onCar && P.mantle <= 0) {
+    if (rng.chance(mc.roofFallChance)) {
+      P.onCar = false; P.grounded = false; P.vy = 2;
+      const out = carDirToWorld(cfg, { x: 0, z: Math.sign(worldToCar(cfg, P.pos).z) || 1 });
+      for (let i = 0; i < 40 && carDistance(cfg, P.pos) < cfg.player.radius + 0.1; i++) { P.pos.x += out.x * 0.1; P.pos.z += out.z * 0.1; }
+      emit(state, 'knocked_off', { by: 'ram' });
+    } else emit(state, 'stagger');
+  } else if (P.mantle > 0) {
+    P.mantle = 0; P.vy = 0; P.grounded = false; // shaken loose mid-climb
+    emit(state, 'stagger');
   }
 }
 
