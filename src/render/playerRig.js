@@ -3,10 +3,23 @@
 import * as THREE from 'three';
 import { forward, aimYaw } from '../sim/game.js';
 import { buildPlayer, posePlayer } from './player.js';
+import { buildSoldier } from './soldier.js';
+import { onModel, model } from './assets.js';
 
 export function createPlayerRig(scene, cfg) {
   const player = buildPlayer();
-  scene.add(player.group);
+  const root = new THREE.Group();   // what moves, turns and blinks; holds whichever figure is showing
+  root.add(player.group);
+  scene.add(root);
+  // the Soldier model takes over from the procedural figure once it (and ideally the pistol) has loaded
+  let soldier = null;
+  const trySoldier = () => {
+    if (soldier || !model('soldier')) return;
+    soldier = buildSoldier(model('soldier'), model('pistol'));
+    root.remove(player.group);
+    root.add(soldier.group);
+  };
+  onModel((key) => { if (key === 'soldier' || (key === 'pistol' && !soldier)) trySoldier(); });
   const flash = new THREE.SpotLight(0xfff3dd, 0, cfg.flashlight.beamRange + 4, cfg.flashlight.beamHalfAngle * 1.35, 0.45, 1.1);
   flash.castShadow = true;
   flash.shadow.mapSize.set(1024, 1024);
@@ -20,25 +33,33 @@ export function createPlayerRig(scene, cfg) {
   return {
     aimPoint,
     onEvent(e) {
-      if (e.type === 'shot') { muzzleT = 0.06; lastShot = e.t; }
+      if (e.type === 'shot') { muzzleT = 0.06; lastShot = e.t; soldier?.shot(); }
+      if (e.type === 'hit') soldier?.hit();
     },
+    get soldier() { return soldier; },
     // Returns the player's visual height (used by the camera).
     update(state, view, dt) {
       const t = state.t, P = state.player;
       const py = P.mantle > 0 ? cfg.car.top * (1 - P.mantle / cfg.player.mantleTime) : P.y;
-      player.group.position.set(P.pos.x, py, P.pos.z);
-      player.group.rotation.y = P.yaw;
+      root.position.set(P.pos.x, py, P.pos.z);
+      root.rotation.y = P.yaw;
       // walk cycle driven by how far you actually moved
-      const moved = Math.hypot(P.pos.x - lastPos.x, P.pos.z - lastPos.z);
+      const mdx = P.pos.x - lastPos.x, mdz = P.pos.z - lastPos.z;
+      const moved = Math.hypot(mdx, mdz);
       lastPos.x = P.pos.x; lastPos.z = P.pos.z;
       const speed = P.grounded && moved < 0.5 ? Math.min(1, moved / Math.max(dt, 1e-3) / cfg.player.speed) : 0;
       walk += moved * 5.2;
       // arms come up to aim with the light on, or just after a shot
       const wantAim = P.flashlightOn || P.flicker || t - lastShot < 1.2 ? 1 : 0;
       aimK += (wantAim - aimK) * Math.min(1, dt * 10);
-      posePlayer(player, { phase: walk, speed, aim: aimK, reloading: P.reloading > 0, interacting: P.interacting, mantling: P.mantle > 0, t });
-      player.lens.material.emissiveIntensity = P.flashlightOn ? 4 : 0;
-      player.group.visible = !(P.invuln > 0 && Math.floor(t * 20) % 2 === 0);
+      const pose = { phase: walk, speed, aim: aimK, reloading: P.reloading > 0, interacting: P.interacting, mantling: P.mantle > 0, t };
+      if (soldier) {
+        const f0 = forward(P.yaw);
+        const n = Math.max(moved, 1e-6);
+        soldier.update({ ...pose, fwd: (mdx * f0.x + mdz * f0.z) / n, side: (mdx * f0.z - mdz * f0.x) / n, dead: !state.alive && !state.won }, dt);
+      } else posePlayer(player, pose);
+      (soldier?.lens || player.lens).material.emissiveIntensity = P.flashlightOn ? 4 : 0;
+      root.visible = !(P.invuln > 0 && Math.floor(t * 20) % 2 === 0);
 
       const f = forward(P.yaw);
       const aim = forward(aimYaw(state));

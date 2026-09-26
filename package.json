@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "FIELD \u2014 3rd-person survival horror experiment (three.js)",
+  "description": "FIELD — 3rd-person survival horror experiment (three.js)",
   "scripts": {
     "dev": "node tools/build.mjs --serve",
     "build": "node tools/build.mjs",
@@ -11,7 +11,8 @@
     "sim": "node tools/simreport.mjs",
     "shots": "node tools/screenshots.mjs",
     "pages-check": "node tools/pages-check.mjs",
-    "hazard-shots": "node tools/hazard-shots.mjs"
+    "hazard-shots": "node tools/hazard-shots.mjs",
+    "model-shots": "node tools/model-shots.mjs"
   },
   "dependencies": {
     "three": "0.186.1"

@@ -16,6 +16,7 @@ page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 await page.goto('file://' + resolve('dist/field.html') + '?seed=SHOTS');
 await page.waitForTimeout(1500);
+const modelsLoaded = await page.evaluate(() => window.__field.modelsReady());
 await page.screenshot({ path: 'shots/01-title.png' });
 
 async function pose(name, fn, wait = 900) {
@@ -195,5 +196,5 @@ const t = await page.evaluate(() => window.__field.game.t);
 await page.screenshot({ path: 'shots/10-live.png' });
 
 await browser.close();
-console.log(JSON.stringify({ liveSimSeconds: +t.toFixed(2), errors }, null, 2));
+console.log(JSON.stringify({ modelsLoaded, liveSimSeconds: +t.toFixed(2), errors }, null, 2));
 if (errors.length) process.exit(1);

@@ -146,6 +146,7 @@ window.__field = {
   startHeadless(s) { seed = s; game = createGame(s); world.reset(); seedHazards(game); eventCursor = 0; phase = 'playing'; showOverlay(null); },
   set(fn) { fn(game, view); },
   get world() { return world; },
+  modelsReady: () => world.modelsReady.then(() => world.loadedModels()),
   get audio() { return audio; },
   frozen: false,
   spot: (name) => spotWorld(game.cfg, name),
