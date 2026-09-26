@@ -25,6 +25,7 @@ export const CONFIG = {
     radio:  { stand: { x: 0.35, z: 1.6 },  face: { x: 0.35, z: 0.95 }, label: 'radio' },   // driver's window
     ammo:   { stand: { x: -3.0, z: 0 },    face: { x: -2.35, z: 0 },   label: 'trunk' },   // trunk
     flares: { stand: { x: 0.9, z: -1.6 },  face: { x: 0.9, z: -0.95 }, label: 'flares' },  // passenger side
+    fire:   { stand: { x: 3.0, z: 0 },     face: { x: 2.35, z: 0 },    label: 'engine' },  // front: put the fire out
     standRange: 1.15,
     faceHalfAngle: 40 * DEG,
   },
@@ -169,6 +170,70 @@ export const CONFIG = {
     deepDarkSpeedMult: 1.4,
     deepDarkPack: 3,       // how many of the crowd come for you at once
     deepDarkRange: 16,     // …from this close
+  },
+  // Hazards (packet 05). Built and tested one by one in the sandbox (?hazard=…); none of them is
+  // scheduled into a normal night yet — that's the next pass, along with tuning.
+  hazards: {
+    fire: {
+      stageEvery: 12,          // it spreads a stage (engine → middle/radio → trunk) this often
+      fuse: 45,                // not out by then: the car goes up (game over)
+      douse: 3,                // seconds of extinguisher per stage
+      snowMult: 3,             // kicking snow on it instead is this much slower
+      extinguisherCharge: 12,  // seconds of spray in the trunk extinguisher
+      extinguisherPickup: 1.2,
+      roofBurnEvery: 2.5,      // standing on the roof over a stage-2+ fire: a hit this often
+      lightRadius: [0, 3.5, 5, 6.5], // by stage: it's light too, and the monsters keep out of it
+      warmRange: 4.5,
+    },
+    swarm: {
+      size: 12, perHit: 3,     // ~4 hits scatter it
+      speed: 3.8, idleSpeed: 1.2,
+      spawnDist: 22, seekRange: 26,
+      radius: 1.4,             // hit radius for a shot
+      reach: 1.3,              // on you / on a flare from this close
+      drainPerSec: 18,         // flashlight battery
+      hurtEvery: 3,
+      smotherRate: 8,          // a flare it sits on burns down this many times faster
+    },
+    tentacles: {
+      max: 3,
+      spawnDist: 18,
+      speed: 1.6, litMult: 0.5, // light (beam, flare, fire) only slows them
+      grabReach: 0.6,
+      dragSpeed: 1.5,
+      breakFree: 8,            // alternate A/D this many times
+      hitsToSever: 2,
+      killDist: 1.2,           // dragged this close to where it came from: gone
+      retractSpeed: 5,
+      trailEvery: 0.25, trailMax: 80, // your footprints, which they follow
+      bodyRadius: 0.35,
+      regrabGrace: 1.2,
+    },
+    cold: {
+      max: 100,
+      drain: 1.0, stillMult: 1.6, roofMult: 2,
+      flareWarm: 8, flareRange: 3,
+      fireWarm: 14,
+      exhaustWarm: 6, exhaustRange: 2,
+      shakeBelow: 35, shakeMax: 3 * DEG,
+      slowMult: 0.55,          // at zero: slowed, no damage (Justin's call)
+    },
+    gust: {
+      warnTime: 1.2, blowTime: 8,
+      flareBurnMult: 3,
+      flickerEvery: 0.12, flickerOffChance: 0.35,
+    },
+    statue: {
+      speed: 2.2, spawnDist: 20, hitRange: 0.9, // frozen only in the flashlight beam (Justin's call)
+    },
+    crawler: {
+      triggerRange: 1.5,       // near the hull (or on the roof)…
+      delayMin: 2, delayMax: 5, // …for this long, then the tell
+      tellTime: 1.2,
+      lungeRange: 1.9,
+      rootTime: 1,
+      cooldown: 12, repelCooldown: 8,
+    },
   },
   sim: {
     dt: 1 / 60,
