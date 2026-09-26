@@ -20,7 +20,7 @@ export function createBeastPool(scene, marks) {
       for (const m of state.monsters) {
         alive.add(m.id);
         let v = beasts.get(m.id);
-        if (!v) { v = buildBeast(); beasts.set(m.id, v); group.add(v.group); v.vis.set(m.pos.x, 0, m.pos.z); }
+        if (!v) { v = buildBeast(m.kind); beasts.set(m.id, v); group.add(v.group); v.vis.set(m.pos.x, 0, m.pos.z); }
         animateBeast(v, m, state, dt);
         // wounded: a trail of blood in the snow as it goes
         if (m.wounds > 0) {
