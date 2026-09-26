@@ -2,11 +2,10 @@
 import { emit } from './events.js';
 import { spotWorld } from './car.js';
 import { bearingTo, dist, wrapAngle } from './math.js';
-import { douseFire, fireBlocks } from './hazards/fire.js';
+import { douseFire } from './hazards/fire.js';
 
 export function spotUsable(state, name) {
   const { player: P, cfg, radio } = state;
-  if (fireBlocks(state, name)) return false;
   if (name === 'fire') return !!state.hazards?.fire;
   if (name === 'ammo' && state.hazards?.fire && !P.hasExtinguisher) return true; // the extinguisher's in there
   if (name === 'radio') return radio.phase === 'repair' || radio.phase === 'call';

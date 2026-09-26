@@ -4,7 +4,7 @@ import { bearingTo, dist, forward, wrapAngle } from './math.js';
 import { bulletScare, woundMonster } from './monster.js';
 import { MODES } from './modes.js';
 import { aimYaw } from './perception.js';
-import { hazardTargets } from './hazards/index.js';
+import { hazardTargets, scatterSwarm } from './hazards/index.js';
 
 export function reloadProgress(P) {
   return P.reloadTotal > 0 ? 1 - P.reloading / P.reloadTotal : 0;
@@ -36,6 +36,7 @@ export function fire(state) {
   P.fireCd = cfg.pistol.fireCooldown;
   P.recoil = Math.min(cfg.pistol.recoilMax, P.recoil + cfg.pistol.recoilKick);
   P.recoilPhase = state.rng.range(0, Math.PI * 2);
+  scatterSwarm(state); // any shot, hit or miss, scatters the swarm
   let best = null, bestD = Infinity;
   for (const m of state.monsters) {
     if (m.mode === MODES.GONE) continue;
@@ -45,7 +46,7 @@ export function fire(state) {
     const rel = Math.abs(wrapAngle(bearingTo(P.pos, m.pos) - aim));
     if (rel <= tol && d < bestD) { best = m; bestD = d; }
   }
-  // hazards in the line of fire (swarm, tentacles, the statue): the nearer of those and the best monster takes it
+  // hazards in the line of fire (tentacles, the zombie): the nearer of those and the best monster takes it
   let hz = null, hzD = Infinity;
   for (const h of hazardTargets(state)) {
     const d = dist(P.pos, h.pos);
