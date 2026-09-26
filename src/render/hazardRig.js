@@ -1,9 +1,10 @@
-// Hazards (packet 05) on screen: fire on the wreck, the swarm, tentacles, the statue, the crawler's tell,
-// and the gust's whiteout. Reads sim state only. Lights are preallocated (one for the fire) so the light
-// count never changes mid-night.
+// Hazards (packet 05) on screen: fire on the wreck, the swarm, tentacles, the zombie (zombie.glb once it loads,
+// placeholder boxes until then), and the gust's wind strength/direction for the snow.
+// Reads sim state only. Lights are preallocated (one for the fire) so the light count never changes mid-night.
 import * as THREE from 'three';
 import { glowTexture } from './textures.js';
-import { carToWorld, fireLightPos, tipHeight } from '../sim/game.js';
+import { carDistance, carToWorld, fireLightPos } from '../sim/game.js';
+import { onModel, applyGrit, GRIT } from './assets.js';
 
 export function createHazardRig(scene, cfg) {
   const root = new THREE.Group();
@@ -35,33 +36,43 @@ export function createHazardRig(scene, cfg) {
   const tentMat = new THREE.MeshStandardMaterial({ color: 0x1a0f14, roughness: 0.5, metalness: 0.1 });
   const tentMeshes = new Map();
 
-  // ---------- statue ----------
-  const stone = new THREE.MeshStandardMaterial({ color: 0x6d6a66, roughness: 0.95 });
-  const statue = new THREE.Group();
-  const box = (w, h, d, x, y, z, rx = 0, rz = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), stone); m.position.set(x, y, z); m.rotation.set(rx, 0, rz); m.castShadow = true; statue.add(m); return m; };
-  box(0.34, 1.0, 0.22, 0, 1.55, 0);            // torso, too long
-  box(0.26, 0.34, 0.26, 0, 2.28, 0.05, 0.35);  // head, bowed
-  box(0.1, 1.15, 0.1, -0.26, 1.35, 0.1, -0.25, 0.08); box(0.1, 1.15, 0.1, 0.26, 1.35, 0.1, -0.25, -0.08); // arms reaching
-  box(0.13, 1.1, 0.13, -0.1, 0.55, 0); box(0.13, 1.1, 0.13, 0.1, 0.55, 0); // legs
-  statue.visible = false; root.add(statue);
+  // ---------- zombie (placeholder boxes until the real asset lands) ----------
+  const flesh = new THREE.MeshStandardMaterial({ color: 0x5f6b58, roughness: 0.95 });
+  const rags = new THREE.MeshStandardMaterial({ color: 0x2a2622, roughness: 1 });
+  const zombie = new THREE.Group();
+  const box = (w, h, d, x, y, z, mat, rx = 0, rz = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.rotation.set(rx, 0, rz); m.castShadow = true; zombie.add(m); return m; };
+  box(0.44, 0.7, 0.26, 0, 1.25, 0, rags, 0.2);           // torso, hunched
+  const head = box(0.24, 0.28, 0.24, 0, 1.72, 0.12, flesh, 0.3, 0.25); // head, lolling
+  const armL = box(0.1, 0.7, 0.1, -0.27, 1.3, 0.3, flesh, -1.3); const armR = box(0.1, 0.7, 0.1, 0.27, 1.3, 0.3, flesh, -1.2); // arms out
+  const legL = box(0.14, 0.9, 0.14, -0.1, 0.45, 0, rags); const legR = box(0.14, 0.9, 0.14, 0.1, 0.45, 0, rags);
+  zombie.visible = false; root.add(zombie);
+  // swap in the real zombie model (packet 06's zombie.glb) once it loads; the boxes are the fallback
+  let zModel = null;
+  onModel((key, gltf) => {
+    if (key !== 'zombie' || zModel) return;
+    const m = gltf.scene.clone(true);
+    applyGrit(m, GRIT.zombie);
+    const box3 = new THREE.Box3().setFromObject(m);
+    const size = box3.getSize(new THREE.Vector3()), c = box3.getCenter(new THREE.Vector3());
+    const k = 1.8 / size.y;
+    m.scale.setScalar(k);
+    m.position.set(-c.x * k, -box3.min.y * k, -c.z * k);
+    zModel = new THREE.Group();
+    zModel.add(m);
+    for (const ch of [...zombie.children]) ch.visible = false;
+    zombie.add(zModel);
+  });
 
-  // ---------- crawler ----------
-  const pale = new THREE.MeshStandardMaterial({ color: 0x9a948a, roughness: 0.8 });
-  const crawler = new THREE.Group();
-  for (let i = 0; i < 4; i++) { const f = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.34), pale); f.position.set(-0.09 + i * 0.06, 0.03, 0.2); crawler.add(f); }
-  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.07, 0.6), pale); arm.position.z = -0.1; crawler.add(arm);
-  crawler.visible = false; root.add(crawler);
-  const snowPuff = new THREE.Mesh(new THREE.IcosahedronGeometry(0.25, 0), new THREE.MeshBasicMaterial({ color: 0xdfe6ee, transparent: true, opacity: 0.6, depthWrite: false }));
-  snowPuff.visible = false; root.add(snowPuff);
-
-  let fogBase = null, gustK = 0, time = 0;
+  let gustK = 0, gustDir = 0, time = 0;
 
   function updateTentacles(state) {
     const alive = new Set();
     for (const T of state.hazards.tentacles) {
       alive.add(T.id);
       const pts = T.path.map((p) => new THREE.Vector3(p.x, 0.12, p.z));
-      pts.push(new THREE.Vector3(T.tip.x, tipHeight(state, T.tip) + (T.state === 'grab' ? 0.9 : 0.15), T.tip.z));
+      const atCar = carDistance(state.cfg, T.tip) < 0.4;
+      const tipY = T.state === 'smash' ? 1.2 + Math.sin(time * 14) * 0.25 : atCar ? 0.6 : 0.15; // reaching up to the light bar
+      pts.push(new THREE.Vector3(T.tip.x, tipY, T.tip.z));
       if (pts.length < 2) continue;
       // wriggle the body so it never lies still
       for (let i = 1; i < pts.length - 1; i++) { pts[i].x += Math.sin(time * 3 + i * 0.9 + T.id) * 0.08; pts[i].z += Math.cos(time * 2.6 + i * 1.1) * 0.08; }
@@ -74,7 +85,7 @@ export function createHazardRig(scene, cfg) {
   }
 
   return {
-    update(state, dt, fog) {
+    update(state, dt) {
       time += dt;
       const hz = state.hazards;
       // fire
@@ -82,17 +93,18 @@ export function createHazardRig(scene, cfg) {
       if (F) {
         const c = fireLightPos(state);
         fireLight.position.set(c.x, 1.4, c.z);
-        fireLight.intensity = (40 + F.stage * 30) * (0.85 + Math.random() * 0.3);
-        const lenBurning = F.stage * 1.6;
+        const grow = F.phase === 'smolder' ? 0 : Math.min(1, 0.3 + F.burnT / 25); // it gets bigger the longer it burns
+        fireLight.intensity = grow * 130 * (0.85 + Math.random() * 0.3);
+        const lenBurning = grow * 1.8;
         for (const f of flames) {
           const lx = 2.1 - ((f.x + 2.1) % 4.2);
-          const on = 2.1 - lx < lenBurning + 0.4;
+          const on = F.phase !== 'smolder' && 2.1 - lx < lenBurning;
           f.s.visible = on;
           if (!on) continue;
           const w = carToWorld(cfg, { x: lx, z: f.z });
           const k = 0.5 + 0.5 * Math.sin(time * 9 + f.seed * 7);
           f.s.position.set(w.x, cfg.car.top + 0.2 + k * 0.5, w.z);
-          f.s.scale.setScalar(0.8 + k * 0.7);
+          f.s.scale.setScalar((0.8 + k * 0.7) * (0.6 + grow * 0.6));
         }
         for (const s of smoke) {
           s.t += dt * 0.35; if (s.t > 1) s.t -= 1;
@@ -110,7 +122,7 @@ export function createHazardRig(scene, cfg) {
       const S = hz.swarm;
       swarm.visible = !!S;
       if (S) {
-        const live = Math.ceil(N * S.count / cfg.hazards.swarm.size);
+        const live = N;
         for (let i = 0; i < N; i++) {
           const [a, b, r] = swarmSeeds[i];
           const on = i < live;
@@ -124,35 +136,26 @@ export function createHazardRig(scene, cfg) {
 
       updateTentacles(state);
 
-      // statue
-      const St = hz.statue;
-      statue.visible = !!St;
-      if (St) { statue.position.set(St.pos.x, 0, St.pos.z); statue.rotation.y = St.yaw; }
-
-      // crawler: fingers and a snow puff at the hull during the tell, the arm out in the lunge
-      const C = hz.crawler;
-      const telling = C && C.state === 'tell';
-      const grabbing = C && C.holdT > 0;
-      crawler.visible = !!(telling || grabbing);
-      snowPuff.visible = !!telling;
-      if (crawler.visible) {
-        crawler.position.set(C.pos.x, 0, C.pos.z);
-        crawler.lookAt(state.player.pos.x, 0, state.player.pos.z);
-        const out = grabbing ? 0.8 : 0.1 + 0.15 * Math.sin(time * 18);
-        crawler.children.forEach((m) => { m.position.z = (m === arm ? -0.1 : 0.2) + out; });
-        snowPuff.position.set(C.pos.x, 0.05 + Math.random() * 0.05, C.pos.z);
-        snowPuff.scale.setScalar(0.8 + Math.random() * 0.5);
+      // zombie: a lurching shamble; stock-still while staggered; arms locked on you in a grab
+      const Z = hz.zombie;
+      zombie.visible = !!Z;
+      if (Z) {
+        zombie.position.set(Z.pos.x, 0, Z.pos.z);
+        zombie.rotation.y = Z.yaw;
+        const walking = Z.state === 'walk', w = time * 4.2;
+        legL.rotation.x = walking ? Math.sin(w) * 0.35 : 0; legR.rotation.x = walking ? -Math.sin(w) * 0.35 : 0;
+        zombie.rotation.z = walking ? Math.sin(w) * 0.08 : Z.state === 'stagger' ? -0.15 : 0;
+        if (zModel) { zModel.position.y = walking ? Math.abs(Math.sin(w)) * 0.05 : 0; zModel.rotation.x = Z.state === 'grab' ? 0.25 : Z.state === 'stagger' ? -0.3 : 0.08; }
+        armL.rotation.x = Z.state === 'grab' ? -1.55 : -1.3 + Math.sin(w * 0.5) * 0.1;
+        armR.rotation.x = Z.state === 'grab' ? -1.55 : -1.2 + Math.cos(w * 0.5) * 0.1;
+        head.rotation.z = 0.25 + Math.sin(time * 1.3) * 0.15;
       }
 
-      // gust: the whiteout thickens the fog and paints it pale while it blows
-      if (fog) {
-        if (fogBase === null) fogBase = { d: fog.density, c: fog.color.clone() };
-        const target = hz.gust && hz.gust.phase === 'blow' ? 1 : 0;
-        gustK += (target - gustK) * Math.min(1, dt * 2.5);
-        fog.density = fogBase.d * (1 + gustK * 3.5);
-        fog.color.copy(fogBase.c).lerp(new THREE.Color(0x2a2e34), gustK);
-      }
-      return gustK;
+      // gust: no fog change — the snow triples and blows hard one way (see snow.js)
+      const target = hz.gust && hz.gust.phase === 'blow' ? 1 : 0;
+      gustK += (target - gustK) * Math.min(1, dt * 2.5);
+      if (hz.gust) gustDir = hz.gust.dir;
+      return { k: gustK, dir: gustDir };
     },
     reset() {
       for (const [, m] of tentMeshes) { root.remove(m); m.geometry.dispose(); }

@@ -1,7 +1,7 @@
 // FIELD — bootstrap and the fixed-step game loop. Everything else lives in:
 //   src/sim     game rules (no rendering)      src/render  three.js scene
 //   src/audio   procedural sound               src/ui      input, HUD, overlays, debug
-import { createGame, step, MODES, wrapAngle, spotWorld, HAZARD_KINDS, spawnHazard } from './sim/game.js';
+import { createGame, step, MODES, wrapAngle, spotWorld, HAZARD_KINDS, spawnHazard, startHazardTest } from './sim/game.js';
 import { randomSeed } from './sim/rng.js';
 import { objectiveBot } from './sim/bots.js';
 import { createWorld } from './render/world.js';
@@ -16,12 +16,17 @@ const canvas = $('game');
 const params = new URLSearchParams(location.search);
 
 let seed = params.get('seed') || randomSeed();
-// Hazard sandbox (packet 05): ?hazard=fire,swarm (or all) spawns those at the start; keys 1–7 spawn
-// fire · swarm · tentacle · cold · gust · statue · crawler at any time.
-const sandbox = params.has('hazard');
+// Hazard sandbox (packet 05): test one hazard at a time. ?hazard (or a test build with FIELD_SANDBOX set)
+// shows a picker on the title screen; ?hazard=fire starts straight into that one. In play, keys 1–4
+// spawn fire · tentacle · whiteout · zombie again (fire from the key catches straight away). Testing one
+// hazard switches off the night's random whiteouts, unless the whiteout is the one being tested.
+const sandbox = params.has('hazard') || !!window.FIELD_SANDBOX;
 const sandboxList = (params.get('hazard') || '').split(',').map((k) => k.trim()).filter(Boolean);
-const startHazards = sandboxList.includes('all') ? HAZARD_KINDS : sandboxList.filter((k) => HAZARD_KINDS.includes(k) || k === 'tentacles');
-function seedHazards(g) { for (const k of startHazards) spawnHazard(g, k); }
+let startHazards = sandboxList.includes('all') ? HAZARD_KINDS : sandboxList.filter((k) => HAZARD_KINDS.includes(k) || k === 'tentacles');
+function seedHazards(g) {
+  if (startHazards.length && !startHazards.includes('gust')) g.cfg.hazards.gust.random = false;
+  for (const k of startHazards) startHazardTest(g, k);
+}
 let game = createGame(seed);
 const world = createWorld(canvas, game.cfg);
 let audio = null;
@@ -45,7 +50,7 @@ const input = createInput(canvas, {
   onDebug() { view.debug = !view.debug; $('debug').hidden = !view.debug; },
   onKey(code) {
     if (code === 'KeyR' && phase === 'over') start(seed);
-    const n = /^Digit([1-7])$/.exec(code);
+    const n = /^Digit([1-4])$/.exec(code);
     if (n && sandbox && phase === 'playing') spawnHazard(game, HAZARD_KINDS[Number(n[1]) - 1]);
   },
 });
@@ -53,6 +58,17 @@ const input = createInput(canvas, {
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement !== canvas && phase === 'playing' && !demo) pause();
 });
+// the sandbox picker: each button starts a night with just that hazard
+if (sandbox) {
+  $('hzPick').hidden = false;
+  $('hzPick').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    e.stopPropagation();
+    startHazards = b.dataset.hz ? [b.dataset.hz] : [];
+    start(phase === 'over' ? randomSeed() : seed);
+  });
+}
 $('overlay').addEventListener('click', () => {
   if (phase === 'title') start(seed);
   else if (phase === 'paused') resume();
@@ -153,4 +169,4 @@ window.__field = {
   MODES,
   spawnHazard: (k) => spawnHazard(game, k),
 };
-if (sandbox) $('demoTag').textContent = 'HAZARD SANDBOX · 1 fire · 2 swarm · 3 tentacle · 4 cold · 5 gust · 6 statue · 7 crawler';
+if (sandbox) $('demoTag').textContent = 'HAZARD SANDBOX · keys 1 fire · 2 tentacle · 3 whiteout · 4 zombie';

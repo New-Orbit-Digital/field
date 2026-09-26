@@ -1,12 +1,20 @@
-// Whiteout gusts: a warning, then a burst of blizzard. Flares burn down faster, the flashlight cuts
-// in and out, and you can barely see (the renderer thickens the fog while state.hazards.gust.phase === 'blow').
+// Whiteout gusts: a warning, then a burst of blizzard from one direction. Flares burn down faster and the
+// flashlight cuts in and out. (The renderer triples the snow and drives it hard along state.hazards.gust.dir.)
 import { emit } from '../events.js';
 
 export function spawnGust(state) {
   const hz = state.hazards;
   if (hz.gust) return;
-  hz.gust = { phase: 'warn', t: 0, flickT: 0, flickOff: false };
+  hz.gust = { phase: 'warn', t: 0, flickT: 0, flickOff: false, dir: state.rng.range(0, Math.PI * 2) };
   emit(state, 'gust_warn');
+}
+
+// Random whiteouts through a normal night (cfg.hazards.gust.random).
+export function stepGustSchedule(state, dt) {
+  const gc = state.cfg.hazards.gust, hz = state.hazards;
+  if (!gc.random) return;
+  if (hz.nextGust == null) hz.nextGust = state.t + state.rng.range(gc.firstMin, gc.firstMax);
+  if (!hz.gust && state.t >= hz.nextGust) { spawnGust(state); hz.nextGust = state.t + state.rng.range(gc.gapMin, gc.gapMax); }
 }
 
 export function stepGust(state, dt) {

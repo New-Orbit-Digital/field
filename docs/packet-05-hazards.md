@@ -1,83 +1,81 @@
-# Packet 05: hazards (2026-09-26)
+# Packet 05: hazards (second revision, 2026-09-26)
 
-Seven new hazards, built one at a time. None of them is in a normal night yet. Scheduling them into play, and tuning, is the next pass.
+**Active:** fire, tentacle, whiteout, zombie.
+**Backlogged:** swarm, cold. Their code and tests are kept; they're just out of the sandbox.
 
-## Try them
-The sandbox URL `?hazard=fire,swarm` (or `?hazard=all`, or a bare `?hazard`) spawns the listed hazards at the start. Keys 1–7 spawn one at any time:
+**What reaches a normal night:**
+- Random whiteouts. The first comes 45–90 s in, then one every 60–120 s.
+- Rammers are retired; the tentacle replaces them.
 
-1 fire · 2 swarm · 3 tentacle · 4 cold · 5 gust · 6 statue · 7 crawler
+Everything else is tested one at a time in the sandbox until it's scheduled and tuned.
 
-Open the debug panel with `` ` `` to see a hazards line.
+## Test them one at a time
+- **Sandbox picker:** `?hazard` shows a picker on the title screen: Fire · Tentacle · Whiteout · Zombie · Normal night.
+- **Direct:** `?hazard=fire` (etc.) skips the picker.
+- **Keys 1–4 in play** spawn another: fire · tentacle · whiteout · zombie. Fire from the key catches straight away, skipping the roll.
+- **Isolation:** testing one hazard turns off that night's random whiteouts, unless the whiteout is the one being tested.
+- **Offline builds:** set `window.FIELD_SANDBOX = true` to get the picker without a URL parameter.
 
-## Justin's calls
-- All seven are in the build set.
-- Fire ignored = the car explodes = game over.
-- Statue freezes in the flashlight beam only.
-- Cold at zero = slowed only, no damage.
-- Tentacle grab: break free by alternating A/D, or shoot it.
-
-## What each does (tunables in `src/sim/config.js` → `hazards`)
+## Active hazards (tunables in `src/sim/config.js` → `hazards`)
 
 **Fire**
-- Starts at the engine and spreads a stage every 12 s (engine → radio → trunk).
-- Stage 2 blocks the radio; stage 3 blocks the trunk.
-- A 45 s fuse ends in an explosion.
-- Hold E at the engine (car front) to fight it:
-  - With the trunk extinguisher: 3 s per stage.
-  - With snow: 3× slower.
-- It counts as light, so monsters keep out.
-- Standing on the roof over a stage-2+ fire costs a hit and knocks you off.
+- Can only start once the first flare is out. After that, every 10 s there's a 1-in-6 chance it catches (Justin's call).
+- It smoulders for 2 s, then burns at the engine. It doesn't spread and blocks nothing.
+- Explosion risk grows with burn time: about 22% by 15 s and 63% by 30 s.
+- The explosion kills the car's lights for good. If you're within 4 m or on the roof, you're also knocked down for 1.5 s, take a hit, and your flashlight is smashed.
+- Counter: hold E at the engine. It takes 3 s with the trunk extinguisher, 9 s kicking snow.
+- While it burns it's light, so monsters keep out.
 
-**Swarm**
-- Seeks your beam, then flares.
-- On you: drains the battery and bites every 3 s.
-- On a flare: smothers it.
-- About 4 shots scatter it.
+**Tentacle** (unchanged, Justin's favourite)
+- Creeps to the car; light slows it.
+- Bursts both light bars, 1.6 s each.
+- Then hauls the car toward the dark. If the car ends up 7 m from where it started, it's lost and you die.
+- Two shots sever it.
 
-**Tentacles**
-- Up to 3 at once, following your footprints. Light only halves their speed.
-- A grab (it can reach the roof) drags you toward its origin. Pulled all the way in = death.
-- Break free with 8 A/D alternations, or 2 shots.
+**Whiteout** (random in a normal night)
+- A 1.2 s warning, then 8 s of wind from one direction.
+- The field snow triples, and a dense close layer of flakes fills the air around you. All of it is driven hard in surges, with no fog change.
+- Flares burn ×3 faster and the flashlight flickers.
 
-**Cold**
-- Body heat drains; standing still ×1.6, on the roof ×2.
-- Flares, the fire and the exhaust warm you.
-- Below 35 heat: aim shake. At 0: slowed ×0.55.
+**Zombie** (keep working on it)
+- Walks at you at 1.3 m/s, even in the beam.
+- It grabs you, including off the roof. Shove it off with 6 A/D alternations within 2.5 s, or it bites: a hit, then it lets go.
+- A shove knocks it back 4 m and it staggers.
+- A bullet staggers it for 0.8 s. It never dies.
+- Uses packet 06's `zombie.glb` once it loads, with placeholder boxes until then.
 
-**Gust**
-- 1.2 s warning, then 8 s of whiteout.
-- Flares burn ×3 faster, the flashlight flickers, fog thickens, snow blows sideways.
+## Backlog
+- **Swarm:** the aesthetic works; the mechanic (any shot scatters it) felt silly.
+- **Cold:** annoying.
 
-**Statue**
-- Moves only when it's out of your beam. Flares don't stop it.
-- A touch costs a hit, then it resets far away.
-- Bullets ricochet off it.
+## Integration with packet 06 (real models, merged to `main` as PR #5)
+- Built on `main` @ `e8d8928`, which already included the first hazards version.
+- `tools/model-shots.mjs` and `tools/screenshots.mjs`: the rammer poses now convert a hunter, since rammers are retired from the crowd.
+- Hooks for the visuals work:
+  - Knocked down: `player.held === 'down'`, with events `knocked_down` / `got_up`.
+  - Zombie state: `walk | grab | stagger`.
+  - Tentacle state: `creep | smash | drag | retract`.
 
-**Crawler**
-- Near the hull or on the roof for 2–5 s → a 1.2 s tell (scrape, snow puff, fingers) → a lunge.
-- The lunge roots you for 1 s, costs a hit, and knocks you off the roof.
-- Beam on it during the tell, or step away.
-
-## Not done (next pass or later)
-- Scheduling hazards into a real night, and tuning.
+## Not done yet
+- Scheduling fire, tentacle and zombie into a normal night, and tuning.
 - Bots and the balance report don't know about hazards.
-- "Monsters bolder in a gust" isn't implemented.
-- Sounds are placeholders from the procedural kit, with no recorded samples. See `docs/sounds.md` for the running list of recorded vs stock sounds.
-- The crawler visual is small and hard to read.
-- The tentacle mesh is rebuilt every frame. That's fine for ≤3, but revisit it if the count grows.
+- Sounds are placeholders; see `docs/sounds.md`.
 
-## Verification (2026-09-26)
-- `npm test`: 43 pass, 0 fail. That's the existing 30 plus 13 hazard tests in `tests/hazards.test.mjs`, one or more per hazard covering both the threat and its counter.
+## Verification (2026-09-26, second revision, on top of `main` @ `e8d8928`)
+- `npm test`: 47 pass, 0 fail. That includes:
+  - Fire: catches only after the first flare, with the first roll at 10 s.
+  - Fire: the 1-in-6 statistics hold over 300 runs.
+  - Normal night: random whiteouts only, at least 60 s apart, and no rammers.
 - `npm run build`: OK.
 - `npm run pages-check`: 0 errors.
-- `npm run hazard-shots`: 7 posed shots, 0 page errors, reviewed.
-- `npm run shots` (existing 18 poses, regression check): 0 errors.
-- All results are from the branch rebased on `main` @ `3f6a1a1`.
+- `npm run hazard-shots`: the picker plus fire, tentacle, whiteout and zombie. 0 errors, reviewed.
+- `npm run model-shots`: all models loaded, 0 errors.
+- `npm run shots` (18 poses, regression check): 0 errors.
 
-## Publish verification (2026-09-26, branch `hazards` as pushed)
-- **Branch matches local:** every code file on `origin/hazards` is byte-identical to the tested local copy (checked with `git diff`).
-- **Clean checkout of `origin/hazards`:**
-  - `npm test`: 43/43.
-  - Build: OK.
-  - `pages-check`: 0 errors.
-  - `hazard-shots`: 0 errors.
+## Publish verification (2026-09-26, branch `hazards-v2` as pushed, on top of `main` @ `e8d8928`)
+- Every code, test and tool file on `origin/hazards-v2` is byte-identical to the locally verified copy (`git diff` shows only this doc and `docs/sounds.md` before they were pushed).
+- On a clean checkout of `origin/hazards-v2`:
+  - `npm test`: 47/47 pass.
+  - `npm run build`: OK.
+  - `npm run pages-check`: 0 errors.
+  - `npm run hazard-shots`: 0 errors.

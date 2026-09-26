@@ -25,7 +25,7 @@ export const CONFIG = {
     radio:  { stand: { x: 0.35, z: 1.6 },  face: { x: 0.35, z: 0.95 }, label: 'radio' },   // driver's window
     ammo:   { stand: { x: -3.0, z: 0 },    face: { x: -2.35, z: 0 },   label: 'trunk' },   // trunk
     flares: { stand: { x: 0.9, z: -1.6 },  face: { x: 0.9, z: -0.95 }, label: 'flares' },  // passenger side
-    fire:   { stand: { x: 3.0, z: 0 },     face: { x: 2.35, z: 0 },    label: 'engine' },  // front: put the fire out
+    fire:   { stand: { x: 3.0, z: 0 },     face: { x: 2.35, z: 0 },    label: 'engine' },  // front: put the fire out (hazard)
     standRange: 1.15,
     faceHalfAngle: 40 * DEG,
   },
@@ -113,8 +113,10 @@ export const CONFIG = {
     //   hunter  — comes for you (stalk, probe, warn, lunge)
     //   breaker — goes for the flashing lights on one side of the car and smashes them (that side stays dark)
     //   rammer  — charges the car and shoves it: jostles, turns or slides it, interrupting whatever you're doing
-    kinds: { hunter: 10, breaker: 4, rammer: 4 },
-    breakOffWeights: { hunter: 0.55, breaker: 0.2, rammer: 0.25 },
+    // Rammers are retired (Justin, packet 05): the car-dragging tentacle replaces them. Their code stays;
+    // set a count and weight here to bring them back.
+    kinds: { hunter: 14, breaker: 4, rammer: 0 },
+    breakOffWeights: { hunter: 0.75, breaker: 0.25, rammer: 0 },
   },
   monster: {
     stalkMinDist: 7,
@@ -171,43 +173,42 @@ export const CONFIG = {
     deepDarkPack: 3,       // how many of the crowd come for you at once
     deepDarkRange: 16,     // …from this close
   },
-  // Hazards (packet 05). Built and tested one by one in the sandbox (?hazard=…); none of them is
-  // scheduled into a normal night yet — that's the next pass, along with tuning.
+  // Hazards (packet 05, second revision). Whiteouts (gust.random) are part of a normal night; fire, tentacle
+  // and zombie are tested one at a time in the sandbox (?hazard) until they're scheduled. Swarm and cold are
+  // backlogged (code kept).
   hazards: {
     fire: {
-      stageEvery: 12,          // it spreads a stage (engine → middle/radio → trunk) this often
-      fuse: 45,                // not out by then: the car goes up (game over)
-      douse: 3,                // seconds of extinguisher per stage
+      igniteEvery: 10, igniteChance: 1 / 6, // once the first flare's out: every 10 s, a 1-in-6 chance it catches (Justin's call)
+      smolderTime: 2,          // after it catches: a couple of seconds of smoke before it really goes
+      explodeK: 1 / 450,       // chance per second the car goes up = burn time × this (≈22% by 15 s, 63% by 30 s)
+      blastRange: 4,           // near the car when it goes: knocked down, a hit, your flashlight dead
+      downTime: 1.5,           // knocked down this long
+      douse: 3,                // seconds of extinguisher to put it out
       snowMult: 3,             // kicking snow on it instead is this much slower
       extinguisherCharge: 12,  // seconds of spray in the trunk extinguisher
       extinguisherPickup: 1.2,
-      roofBurnEvery: 2.5,      // standing on the roof over a stage-2+ fire: a hit this often
-      lightRadius: [0, 3.5, 5, 6.5], // by stage: it's light too, and the monsters keep out of it
+      lightMin: 2, lightMax: 6.5, lightGrow: 0.15, // it's light too (grows as it burns); the monsters keep out of it
       warmRange: 4.5,
     },
     swarm: {
-      size: 12, perHit: 3,     // ~4 hits scatter it
       speed: 3.8, idleSpeed: 1.2,
       spawnDist: 22, seekRange: 26,
-      radius: 1.4,             // hit radius for a shot
       reach: 1.3,              // on you / on a flare from this close
       drainPerSec: 18,         // flashlight battery
       hurtEvery: 3,
       smotherRate: 8,          // a flare it sits on burns down this many times faster
+      // any gunshot scatters it (Justin's call)
     },
     tentacles: {
       max: 3,
       spawnDist: 18,
-      speed: 1.6, litMult: 0.5, // light (beam, flare, fire) only slows them
-      grabReach: 0.6,
-      dragSpeed: 1.5,
-      breakFree: 8,            // alternate A/D this many times
+      speed: 1.6, litMult: 0.5, // light (beam, flare, fire) only slows it on the way in
+      smashTime: 1.6,          // per side of the light bar
+      dragSpeed: 0.35,         // then it hauls the car toward the dark…
+      loseDist: 7,             // …and if the car ends up this far from where it started, it's gone (game over)
       hitsToSever: 2,
-      killDist: 1.2,           // dragged this close to where it came from: gone
       retractSpeed: 5,
-      trailEvery: 0.25, trailMax: 80, // your footprints, which they follow
-      bodyRadius: 0.35,
-      regrabGrace: 1.2,
+      bodyRadius: 0.5,
     },
     cold: {
       max: 100,
@@ -222,17 +223,21 @@ export const CONFIG = {
       warnTime: 1.2, blowTime: 8,
       flareBurnMult: 3,
       flickerEvery: 0.12, flickerOffChance: 0.35,
+      random: true,            // part of a normal night: they blow in at random (Justin's call)
+      firstMin: 45, firstMax: 90, // the first one somewhere in here…
+      gapMin: 60, gapMax: 120,  // …then one every so often
+      // the renderer piles on snow and drives it hard in one direction (no fog change)
     },
-    statue: {
-      speed: 2.2, spawnDist: 20, hitRange: 0.9, // frozen only in the flashlight beam (Justin's call)
-    },
-    crawler: {
-      triggerRange: 1.5,       // near the hull (or on the roof)…
-      delayMin: 2, delayMax: 5, // …for this long, then the tell
-      tellTime: 1.2,
-      lungeRange: 1.9,
-      rootTime: 1,
-      cooldown: 12, repelCooldown: 8,
+    zombie: {
+      speed: 1.3,              // slow, but light doesn't stop it
+      spawnDist: 20,
+      grabRange: 0.8,
+      shoveFree: 6,            // alternate A/D this many times to shove it off…
+      biteAfter: 2.5,          // …before it bites (a hit, and it lets go)
+      shoveDist: 4,
+      staggerTime: 1.5,        // after a shove
+      shotStagger: 0.8,        // a bullet stops it for a moment; it doesn't die
+      bodyRadius: 0.45,
     },
   },
   sim: {

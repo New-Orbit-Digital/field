@@ -56,12 +56,13 @@ export function createGame(seed, overrides = {}) {
       interactBlock: false, // a ram knocked you off what you were doing: let go of E and press it again
       // hazards
       speedMult: 1,        // walking speed multiplier (cold)
-      held: null,          // grabbed: a tentacle's id, or 'crawler' — can't walk
+      held: null,          // 'zombie' (grabbed) or 'down' (knocked flat by the explosion): can't walk
       heat: 100,           // body heat (only drains once the cold hazard is on)
       aimShake: 0, shakePhase: 0, // cold hands
       extinguisher: 0,     // seconds of spray left (0 = not fetched from the trunk yet, or empty)
       hasExtinguisher: false,
       flicker: false,      // flashlight cutting out in a gust
+      flashlightBroken: false, // the explosion wrecked it: it never comes back on
     },
     monsters: [],
     hazards: createHazards(),
@@ -74,7 +75,8 @@ export function createGame(seed, overrides = {}) {
 export function mergeConfig(base, over) {
   const out = {};
   for (const k of Object.keys(base)) {
-    out[k] = typeof base[k] === 'object' ? { ...base[k], ...(over[k] || {}) } : base[k];
+    // deep copy so a game (or a test) that tweaks a nested tunable never changes CONFIG for the next one
+    out[k] = typeof base[k] === 'object' ? { ...structuredClone(base[k]), ...(over[k] || {}) } : base[k];
   }
   return out;
 }
@@ -115,4 +117,4 @@ export { aimYaw, inViewGeometry, inBeam, inFlare, flareRadius, inDimArea, isLit,
 export { MODES, HUNTING } from './modes.js';
 export { attackerCap, hunterCount } from './horde.js';
 export { reloadProgress } from './pistol.js';
-export { HAZARD_KINDS, spawnHazard, fireLight, fireLightPos, tipHeight, exhaustPos } from './hazards/index.js';
+export { HAZARD_KINDS, spawnHazard, startHazardTest, fireLight, fireLightPos, exhaustPos } from './hazards/index.js';

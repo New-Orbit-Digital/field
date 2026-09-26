@@ -205,24 +205,27 @@ export function createAudio() {
         startSiren();
         break;
       // ---------- hazards (packet 05): placeholder cues from the procedural kit ----------
-      case 'fire_start': case 'fire_spread': hiss(pos.x, pos.z, 2.5, 0.4, 900); crunch(pos.x, pos.z, { gain: 0.3, pitch: 0.5 }); break;
-      case 'fire_down': case 'fire_out': hiss(pos.x, pos.z, 0.8, 0.25, 5000); break;
+      case 'fire_start': hiss(pos.x, pos.z, 2, 0.15, 2500); break;
+      case 'fire_grow': hiss(pos.x, pos.z, 2.5, 0.4, 900); crunch(pos.x, pos.z, { gain: 0.3, pitch: 0.5 }); break;
+      case 'fire_out': hiss(pos.x, pos.z, 0.8, 0.25, 5000); break;
       case 'car_exploded': thud(); clang(pos.x, pos.z, { gain: 0.9, freq: 160 }); hiss(pos.x, pos.z, 3, 0.6, 700); break;
+      case 'knocked_down': thud(); break;
       case 'extinguisher_pickup': metalClick(0, 900, 0.25); break;
       case 'swarm_start': hiss(pos.x, pos.z, 3, 0.18, 6500); break;
       case 'swarm_hit': crunch(pos.x, pos.z, { gain: 0.25, pitch: 1.8 }); break;
       case 'swarm_scattered': hiss(pos.x, pos.z, 1.2, 0.25, 7000); break;
       case 'tentacle_start': scrape(pos.x, pos.z, 1.5); break;
-      case 'tentacle_grab': thud(); scrape(pos.x, pos.z, 0.8); break;
-      case 'struggle': crunch(null, null, { gain: 0.2, pitch: 0.9 }); break;
+      case 'tentacle_smash': for (let i = 0; i < 5; i++) clang(pos.x, pos.z, { gain: 0.4, when: i * 0.3, freq: 400 + Math.random() * 120 }); break;
+      case 'tentacle_drag': scrape(pos.x, pos.z, 3); clang(pos.x, pos.z, { gain: 0.5, freq: 150 }); break;
       case 'tentacle_hit': crunch(pos.x, pos.z, { gain: 0.3, pitch: 0.6 }); break;
-      case 'tentacle_severed': case 'tentacle_escaped': moan(pos.x, pos.z); break;
+      case 'tentacle_severed': moan(pos.x, pos.z); break;
+      case 'struggle': crunch(null, null, { gain: 0.2, pitch: 0.9 }); break;
       case 'gust_warn': hiss(pos.x, pos.z, cfg.hazards.gust.warnTime + cfg.hazards.gust.blowTime, 0.5, 500); break;
-      case 'statue_move': scrape(pos.x, pos.z, 0.5); break;
-      case 'crawler_tell': scrape(pos.x, pos.z, cfg.hazards.crawler.tellTime); crunch(pos.x, pos.z, { gain: 0.4, pitch: 0.6 }); break;
-      case 'crawler_grab': thud(); break;
-      case 'crawler_repelled': growl(pos.x, pos.z, 0.6); break;
-      case 'ricochet': metalClick(0, 3200, 0.2); break;
+      case 'zombie_start': moan(pos.x, pos.z); break;
+      case 'zombie_grab': thud(); growl(pos.x, pos.z, 0.8); break;
+      case 'zombie_bite': growl(pos.x, pos.z, 0.4); break;
+      case 'zombie_shoved': crunch(pos.x, pos.z, { gain: 0.5, pitch: 0.7 }); break;
+      case 'zombie_hit': crunch(pos.x, pos.z, { gain: 0.35, pitch: 0.6 }); break;
       case 'rescued': case 'death': heartbeat(10, 0.9); break;
     }
   }

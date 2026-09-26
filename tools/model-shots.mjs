@@ -37,7 +37,8 @@ for (const [kind, mode] of [['hunter', 'warn'], ['breaker', 'stalk'], ['rammer',
   await shot(kind, `window.__field.set((g, v) => {
     window.__clear(g);
     g.player.pos = { x: 0, z: 6 }; g.player.y = 0; g.player.yaw = 0.1; g.player.flashlightOn = true; v.pitch = -0.04;
-    const m = g.monsters.find((q) => q.kind === '${kind}');
+    // rammers are retired from the crowd (packet 05): convert a hunter to show the model
+    const m = g.monsters.find((q) => q.kind === '${kind}') || Object.assign(g.monsters.find((q) => q.kind === 'hunter'), { kind: '${kind}' });
     m.mode = '${mode}'; m.timer = 99; m.pos = { x: 1.6, z: 11.5 };
     g.t = 0.25;
   })`);

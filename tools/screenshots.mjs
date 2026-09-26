@@ -184,7 +184,8 @@ await pose('18-kinds', () => window.__field.set((g, v) => {
   window.__calm(g);
   g.flares = [{ pos: { x: 0, z: 10 }, from: { x: 0, z: 10 }, state: 'burning', t: 2, burn: 60 }];
   g.player.pos = { x: 0, z: 5 }; g.player.yaw = 0; g.player.flashlightOn = false; v.pitch = 0.02;
-  const pick = (k) => g.monsters.find((m) => m.kind === k && m.mode === 'shamble');
+  // rammers are retired from the crowd (packet 05) but still drawn here for reference: convert a hunter
+  const pick = (k) => g.monsters.find((m) => m.kind === k && m.mode === 'shamble') || Object.assign(g.monsters.find((m) => m.kind === 'hunter' && m.mode === 'shamble'), { kind: k });
   [['hunter', -2.6], ['breaker', 0], ['rammer', 2.8]].forEach(([k, x]) => { const m = pick(k); m.mode = 'stalk'; m.timer = 99; m.pos = { x, z: 11.5 }; });
   g.t = 0.25;
 }), 1500);
