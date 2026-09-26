@@ -5,8 +5,8 @@ import { $, fmt, KEY } from './dom.js';
 
 // Prompt text when you're standing at a car spot and facing it.
 const PROMPTS = {
-  radio: (g) => g.hazards.fire && g.hazards.fire.stage >= 2 ? 'Too hot — the fire has reached the radio' : g.radio.phase === 'repair' ? `${KEY('E')} Repair the radio` : g.radio.phase === 'call' ? `${KEY('E')} Call for help` : 'Radio: waiting on dispatch',
-  ammo: (g) => g.hazards.fire && g.hazards.fire.stage >= 3 ? 'The trunk is on fire' : g.hazards.fire && !g.player.hasExtinguisher ? `${KEY('E')} Grab the extinguisher` : g.player.reserve < g.cfg.pistol.maxReserve ? `${KEY('E')} Grab ammo` : 'Ammo full',
+  radio: (g) => g.radio.phase === 'repair' ? `${KEY('E')} Repair the radio` : g.radio.phase === 'call' ? `${KEY('E')} Call for help` : 'Radio: waiting on dispatch',
+  ammo: (g) => g.hazards.fire && !g.player.hasExtinguisher ? `${KEY('E')} Grab the extinguisher` : g.player.reserve < g.cfg.pistol.maxReserve ? `${KEY('E')} Grab ammo` : 'Ammo full',
   fire: (g) => g.player.extinguisher > 0 ? `${KEY('E')} Spray the extinguisher · ${Math.round(100 * g.player.extinguisher / g.cfg.hazards.fire.extinguisherCharge)}%` : g.player.hasExtinguisher ? `${KEY('E')} Kick snow on it — the extinguisher's empty` : `${KEY('E')} Kick snow on the fire — there's an extinguisher in the trunk`,
   flares: (g) => g.player.flares >= g.cfg.flares.carryMax ? 'Already holding a flare' : g.t < g.flareReadyAt ? `Digging out the next flare… ${Math.ceil(g.flareReadyAt - g.t)}s` : `${KEY('E')} Take a flare`,
 };
@@ -35,7 +35,7 @@ export function update(game, phase, world) {
 
   // hazards: a status line under the objective, the warmth bar, frost at the edges
   const hz = game.hazards, bits = [];
-  if (hz.fire) bits.push(`FIRE · ${Math.ceil(hz.fire.fuse)}s`);
+  if (hz.fire) bits.push(hz.fire.phase === 'smolder' ? 'SMOKE AT THE ENGINE' : `ENGINE FIRE · ${Math.floor(hz.fire.burnT)}s — put it out`);
   if (hz.gust && hz.gust.phase === 'blow') bits.push('WHITEOUT');
   $('hazardLine').textContent = bits.join('   ');
   $('warmWrap').hidden = !hz.cold;
@@ -46,7 +46,7 @@ export function update(game, phase, world) {
   $('frost').style.opacity = hz.cold ? String(Math.max(0, 1 - P.heat / (cfg.hazards.cold.max * 0.5)).toFixed(2)) : '0';
 
   // interaction prompt at the car (a grab overrides everything)
-  const held = P.held != null ? (P.held === 'crawler' ? 'Something has your ankle' : `${KEY('A')} ${KEY('D')} ${KEY('A')} ${KEY('D')} break free — or shoot it`) : null;
+  const held = P.held === 'zombie' ? `${KEY('A')} ${KEY('D')} ${KEY('A')} ${KEY('D')} shove it off — or shoot it` : P.held === 'down' ? 'Knocked flat…' : null;
   $('prompt').classList.toggle('urgent', !!held);
   const prompt = held || (P.activeSpot ? PROMPTS[P.activeSpot](game) : P.onCar ? 'On the roof — you can see further, but you can\'t reach anything from up here' : '');
   if (prompt !== lastPrompt) { $('prompt').innerHTML = prompt; lastPrompt = prompt; }
@@ -108,16 +108,14 @@ export function onEvent(e, game) {
   if (e.type === 'lights_smashed') toast('Something smashed the lights on that side.');
   if (e.type === 'interrupted') toast('The car lurched. Hold E again.');
   const HZ_TOASTS = {
-    fire_start: 'Fuel\'s caught at the engine. Put it out before it reaches the tank.',
-    fire_spread: 'The fire is spreading.', fire_out: 'The fire\'s out.',
+    fire_start: 'Smoke from the engine…', fire_grow: 'The engine\'s on fire. Put it out before the tank goes.', fire_out: 'The fire\'s out.',
+    car_exploded: 'The car went up. The lights are gone.', flashlight_broken: 'Your flashlight\'s smashed.',
     extinguisher_pickup: 'Got the extinguisher.', extinguisher_empty: 'The extinguisher is empty.',
-    swarm_start: 'Something small, lots of them — drawn to your light.', swarm_scattered: 'The swarm scatters.',
-    tentacle_start: 'Something is sliding over the snow, along your tracks.', tentacle_severed: 'You shot it loose.', tentacle_escaped: 'You tore free.',
+    swarm_start: 'Something small, lots of them — drawn to your light.', swarm_scattered: 'The gunshot scatters the swarm.',
+    tentacle_start: 'Something is sliding over the snow toward the car.', tentacle_drag: 'It\'s dragging the car into the dark! Shoot it!', tentacle_severed: 'You shot it loose.',
     cold_start: 'It\'s getting colder. Keep moving; stay near the heat.', cold_numb: 'You can\'t feel your legs.',
     gust_warn: 'The wind is picking up…',
-    statue_start: 'Something out there. It moves when you look away.',
-    crawler_tell: 'Something under the car!', crawler_repelled: 'It pulls back under the car.',
-    ricochet: 'The bullet does nothing to it.',
+    zombie_start: 'Someone\'s walking toward you. It isn\'t stopping.', zombie_shoved: 'You shove it off.',
   };
   if (HZ_TOASTS[e.type]) toast(HZ_TOASTS[e.type]);
 }
