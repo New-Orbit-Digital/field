@@ -117,6 +117,7 @@ function frame(now) {
     view.moving = false;
   }
 
+  view.hazardOn = audio?.hazardOn() ?? null;
   world.update(game, view, dtReal);
   hud.update(game, phase, world);
   if (view.debug) renderDebug(game, seed);
@@ -134,6 +135,7 @@ window.__field = {
   startHeadless(s) { seed = s; game = createGame(s); world.reset(); eventCursor = 0; phase = 'playing'; showOverlay(null); },
   set(fn) { fn(game, view); },
   get world() { return world; },
+  get audio() { return audio; },
   frozen: false,
   spot: (name) => spotWorld(game.cfg, name),
   MODES,
