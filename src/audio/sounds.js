@@ -187,5 +187,36 @@ export function createSounds({ ctx, master, noiseBuf }) {
     o.connect(lp).connect(g).connect(pn); o.start(t); o.stop(t + 2.5);
   }
 
-  return { crunch, breath, growl, shriek, thud, heartbeat, click, gunshot, metalClick, hiss, blip, scrape, moan };
+  // Metal struck hard, somewhere in the world (a breaker hammering the light bar, a rammer hitting the car).
+  function clang(x, z, { gain = 0.5, when = 0, freq = 420 } = {}) {
+    const t = ctx.currentTime + when;
+    const pn = panner(ctx, x, 0.8, z, { ref: 2, rolloff: 1 }); pn.connect(master);
+    for (const [f, a] of [[freq, 1], [freq * 2.76, 0.5], [freq * 5.4, 0.25]]) {
+      const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f * (0.97 + Math.random() * 0.06);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(gain * a, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.35 + a * 0.3);
+      o.connect(g).connect(pn); o.start(t); o.stop(t + 0.8);
+    }
+    const src = ctx.createBufferSource(); src.buffer = noiseBuf;
+    const g = ctx.createGain(); g.gain.setValueAtTime(gain * 0.8, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+    src.connect(g).connect(pn); src.start(t, Math.random(), 0.1);
+  }
+
+  // Glass giving way: a bright crack, then tinkling pieces.
+  function glass(x, z) {
+    const t = ctx.currentTime;
+    const pn = panner(ctx, x, 0.4, z, { ref: 2, rolloff: 1 }); pn.connect(master);
+    const src = ctx.createBufferSource(); src.buffer = noiseBuf;
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2500;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    src.connect(hp).connect(g).connect(pn); src.start(t, Math.random(), 0.3);
+    for (let i = 0; i < 14; i++) {
+      const w = t + 0.05 + Math.random() * 0.9;
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 3000 + Math.random() * 5000;
+      const tg = ctx.createGain(); tg.gain.setValueAtTime(0.08 * Math.random() + 0.02, w); tg.gain.exponentialRampToValueAtTime(0.001, w + 0.06);
+      o.connect(tg).connect(pn); o.start(w); o.stop(w + 0.08);
+    }
+  }
+
+  return { crunch, breath, growl, shriek, thud, heartbeat, click, gunshot, metalClick, hiss, blip, scrape, moan, clang, glass };
 }
