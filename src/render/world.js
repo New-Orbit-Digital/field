@@ -15,15 +15,19 @@ import { carToWorld, carDirToWorld, forward } from '../sim/game.js';
 import { buildSnow } from './snow.js';
 import { createFollowCamera } from './followCamera.js';
 import { buildDebugRings } from './debugRings.js';
+import { psxEnabled, installVertexSnap, createPsxPass } from './psx.js';
 
 export function createWorld(canvas, cfg) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true });
+  const psxOn = psxEnabled();
+  if (psxOn) installVertexSnap(); // before any material compiles
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !psxOn, powerPreference: 'high-performance', preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  const psx = psxOn ? createPsxPass(renderer) : null;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x020308);
@@ -58,6 +62,10 @@ export function createWorld(canvas, cfg) {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     renderer.setSize(w, h, false);
     cam.resize(w, h);
+    psx?.resize(w, h);
+    // three sizes points against the canvas, not the render target, so shrink them to match the low-res pass
+    const buf = renderer.getDrawingBufferSize(new THREE.Vector2());
+    snow.points.material.size = psx ? 0.06 * psx.target.height / buf.y : 0.06;
   }
 
   function onEvent(e) {
@@ -90,7 +98,8 @@ export function createWorld(canvas, cfg) {
     snow.update(dt, state.player.pos);
     cam.update(state, view, py, dt);
     debugRings.visible = view.debug;
-    renderer.render(scene, cam.camera);
+    if (psx) psx.render(scene, cam.camera);
+    else renderer.render(scene, cam.camera);
   }
 
   // Your breath: a small cloud every few seconds — quicker when you're moving, fast and ragged after a hit.
@@ -118,5 +127,5 @@ export function createWorld(canvas, cfg) {
   resize();
   function reset() { beasts.reset(); marks.reset(); tracks.reset(); }
 
-  return { renderer, scene, camera: cam.camera, update, resize, onEvent, reset, aimScreen };
+  return { renderer, psx: psxOn, scene, camera: cam.camera, update, resize, onEvent, reset, aimScreen };
 }
