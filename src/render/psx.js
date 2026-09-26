@@ -1,4 +1,4 @@
-// PS1-style render pass. The scene is drawn into a small render target (~240 lines), then blown up
+// PS1-style render pass. The scene is drawn into a low-res render target (480 lines by default), then blown up
 // to the canvas with nearest-neighbour sampling, ordered dithering and 15-bit colour.
 // Vertex snapping (the PS1 "wobble") is patched into three.js's shared vertex chunk, so it covers
 // every material, including models loaded later.
@@ -6,13 +6,16 @@
 import * as THREE from 'three';
 
 export const PSX = {
-  lines: 240,       // internal vertical resolution
-  snap: [320, 240], // vertex-snap grid in screen space (coarser = more wobble)
+  lines: 480,       // internal vertical resolution (override: ?psxLines=N)
+  snap: [640, 480], // vertex-snap grid in screen space (coarser = more wobble); follows psxLines at 4:3
   levels: 31,       // colour levels per channel (31 = PS1 15-bit colour)
 };
 
 export function psxEnabled() {
-  return new URLSearchParams(location.search).get('psx') !== '0';
+  const q = new URLSearchParams(location.search);
+  const lines = Number(q.get('psxLines'));
+  if (lines > 0) { PSX.lines = lines; PSX.snap = [Math.round(lines * 4 / 3), lines]; }
+  return q.get('psx') !== '0';
 }
 
 // Must run before any material compiles.
