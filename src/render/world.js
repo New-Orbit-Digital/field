@@ -15,6 +15,7 @@ import { carToWorld, carDirToWorld, forward } from '../sim/game.js';
 import { buildSnow } from './snow.js';
 import { createFollowCamera } from './followCamera.js';
 import { buildDebugRings } from './debugRings.js';
+import { createHazardRig } from './hazardRig.js';
 import { psxEnabled, installVertexSnap, createPsxPass } from './psx.js';
 
 export function createWorld(canvas, cfg) {
@@ -47,6 +48,7 @@ export function createWorld(canvas, cfg) {
   const debugRings = buildDebugRings(cfg);
   scene.add(landmark.group, ...landmark.lights, snow.points, debugRings);
   const cam = createFollowCamera();
+  const hazardRig = createHazardRig(scene, cfg);
 
   // vapour: both engines idling, and your breath in the cold
   const puffs = createPuffs(scene);
@@ -95,7 +97,8 @@ export function createWorld(canvas, cfg) {
     truckExhaust.update(dt, truckPipe, truckDir);
     breathe(state, view, py, dt);
     puffs.update(dt, cam.camera);
-    snow.update(dt, state.player.pos);
+    const gust = hazardRig.update(state, dt, scene.fog);
+    snow.update(dt, state.player.pos, gust);
     cam.update(state, view, py, dt);
     debugRings.visible = view.debug;
     if (psx) psx.render(scene, cam.camera);
@@ -125,7 +128,7 @@ export function createWorld(canvas, cfg) {
   }
 
   resize();
-  function reset() { beasts.reset(); marks.reset(); tracks.reset(); }
+  function reset() { beasts.reset(); marks.reset(); tracks.reset(); hazardRig.reset(); }
 
   return { renderer, psx: psxOn, scene, camera: cam.camera, update, resize, onEvent, reset, aimScreen };
 }

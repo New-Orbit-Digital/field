@@ -34,7 +34,7 @@ export function createPlayerRig(scene, cfg) {
       const speed = P.grounded && moved < 0.5 ? Math.min(1, moved / Math.max(dt, 1e-3) / cfg.player.speed) : 0;
       walk += moved * 5.2;
       // arms come up to aim with the light on, or just after a shot
-      const wantAim = P.flashlightOn || t - lastShot < 1.2 ? 1 : 0;
+      const wantAim = P.flashlightOn || P.flicker || t - lastShot < 1.2 ? 1 : 0;
       aimK += (wantAim - aimK) * Math.min(1, dt * 10);
       posePlayer(player, { phase: walk, speed, aim: aimK, reloading: P.reloading > 0, interacting: P.interacting, mantling: P.mantle > 0, t });
       player.lens.material.emissiveIntensity = P.flashlightOn ? 4 : 0;
