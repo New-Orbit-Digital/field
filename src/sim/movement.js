@@ -30,14 +30,15 @@ export function stepMovement(state, input, dt) {
   const f = forward(P.yaw);
   const left = { x: f.z, z: -f.x };
   let mx = input.moveX || 0, mz = input.moveZ || 0;
+  if (P.held) { mx = 0; mz = 0; } // grabbed: A/D is for struggling, not walking
   const m = Math.hypot(mx, mz);
   if (m > 1) { mx /= m; mz /= m; }
-  const spd = pc.speed * (P.reloading > 0 ? 0.6 : 1);
+  const spd = pc.speed * (P.reloading > 0 ? 0.6 : 1) * (P.speedMult ?? 1);
   P.pos.x += (f.x * mz - left.x * mx) * spd * dt;
   P.pos.z += (f.z * mz - left.z * mx) * spd * dt;
 
   // --- jump / gravity ---
-  if (input.jump && P.grounded) {
+  if (input.jump && P.grounded && !P.held) {
     P.vy = pc.jumpVelocity; P.grounded = false;
     emit(state, 'jump');
   }

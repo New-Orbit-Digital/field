@@ -2,9 +2,13 @@
 import { emit } from './events.js';
 import { spotWorld } from './car.js';
 import { bearingTo, dist, wrapAngle } from './math.js';
+import { douseFire, fireBlocks } from './hazards/fire.js';
 
 export function spotUsable(state, name) {
   const { player: P, cfg, radio } = state;
+  if (fireBlocks(state, name)) return false;
+  if (name === 'fire') return !!state.hazards?.fire;
+  if (name === 'ammo' && state.hazards?.fire && !P.hasExtinguisher) return true; // the extinguisher's in there
   if (name === 'radio') return radio.phase === 'repair' || radio.phase === 'call';
   if (name === 'ammo') return P.reserve < cfg.pistol.maxReserve;
   if (name === 'flares') return P.flares < cfg.flares.carryMax && state.carFlares > 0 && state.t >= state.flareReadyAt;
@@ -34,7 +38,15 @@ export function doInteract(state, name, dt) {
     }
     return;
   }
+  if (name === 'fire') { douseFire(state, dt); return; }
   P.hold += dt;
+  if (name === 'ammo' && state.hazards?.fire && !P.hasExtinguisher) {
+    if (P.hold >= cfg.hazards.fire.extinguisherPickup) {
+      P.hasExtinguisher = true; P.extinguisher = cfg.hazards.fire.extinguisherCharge; P.hold = 0;
+      emit(state, 'extinguisher_pickup');
+    }
+    return;
+  }
   if (name === 'ammo' && P.hold >= cfg.pistol.pickupTime) {
     P.reserve = Math.min(cfg.pistol.maxReserve, P.reserve + cfg.pistol.pickupAmount);
     P.hold = 0;
@@ -51,8 +63,8 @@ export function doInteract(state, name, dt) {
 export function stepInteract(state, input, dt) {
   const { player: P, cfg } = state;
   P.activeSpot = null;
-  if (P.grounded && !P.onCar && P.reloading <= 0) {
-    for (const name of ['radio', 'ammo', 'flares']) {
+  if (P.grounded && !P.onCar && P.reloading <= 0 && !P.held) {
+    for (const name of state.hazards?.fire ? ['fire', 'radio', 'ammo', 'flares'] : ['radio', 'ammo', 'flares']) {
       const s = spotWorld(cfg, name);
       if (dist(P.pos, s.stand) > cfg.spots.standRange) continue;
       if (Math.abs(wrapAngle(bearingTo(P.pos, s.face) - P.yaw)) > cfg.spots.faceHalfAngle) continue;

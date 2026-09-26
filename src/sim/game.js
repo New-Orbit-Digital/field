@@ -7,6 +7,7 @@ import { createCrowd, stepHorde } from './horde.js';
 import { stepDeepDark, stepMonster } from './monster.js';
 import { stepPlayer } from './player.js';
 import { stepRadio } from './radio.js';
+import { createHazards, stepHazards } from './hazards/index.js';
 
 // ---------- setup ----------
 export function createGame(seed, overrides = {}) {
@@ -53,8 +54,17 @@ export function createGame(seed, overrides = {}) {
       hold: 0,             // pickup hold progress
       interacting: false,
       interactBlock: false, // a ram knocked you off what you were doing: let go of E and press it again
+      // hazards
+      speedMult: 1,        // walking speed multiplier (cold)
+      held: null,          // grabbed: a tentacle's id, or 'crawler' — can't walk
+      heat: 100,           // body heat (only drains once the cold hazard is on)
+      aimShake: 0, shakePhase: 0, // cold hands
+      extinguisher: 0,     // seconds of spray left (0 = not fetched from the trunk yet, or empty)
+      hasExtinguisher: false,
+      flicker: false,      // flashlight cutting out in a gust
     },
     monsters: [],
+    hazards: createHazards(),
   };
   createCrowd(state);
   startFlare(state);
@@ -75,6 +85,8 @@ export function step(state, input, dt = state.cfg.sim.dt) {
   if (!state.alive) return;
   state.t += dt;
   stepPlayer(state, input, dt);
+  stepHazards(state, input, dt);
+  if (!state.alive) return;
   stepRadio(state, dt);
   stepFlares(state, dt);
   stepHorde(state, dt);
@@ -103,3 +115,4 @@ export { aimYaw, inViewGeometry, inBeam, inFlare, flareRadius, inDimArea, isLit,
 export { MODES, HUNTING } from './modes.js';
 export { attackerCap, hunterCount } from './horde.js';
 export { reloadProgress } from './pistol.js';
+export { HAZARD_KINDS, spawnHazard, fireLight, fireLightPos, tipHeight, exhaustPos } from './hazards/index.js';
