@@ -164,6 +164,30 @@ for (let i = 0; i < 40; i++) {
 }
 await pose('15-footprints', () => window.__field.set((g, v) => { g.player.pos = { x: 3, z: 3.2 }; g.player.yaw = 0.2; v.pitch = -0.45; g.t = 0.25; }), 1200);
 
+// New models: the wreck close up, you, and the three kinds side by side; one side's lights smashed.
+await pose('16-wreck', () => window.__field.set((g, v) => {
+  window.__calm(g);
+  g.flares = [{ pos: { x: 3.5, z: 4.5 }, from: { x: 3.5, z: 4.5 }, state: 'burning', t: 2, burn: 60 }];
+  g.strobes = [false, true];
+  g.player.pos = { x: 4.2, z: 4.6 }; g.player.yaw = Math.atan2(-4.2, -4.6) - 0.35; g.player.flashlightOn = false; v.pitch = -0.15;
+  g.t = 0.25;
+}), 1200);
+await pose('17-player', () => window.__field.set((g, v) => {
+  window.__calm(g);
+  g.strobes = [true, true];
+  g.flares = [{ pos: { x: 2, z: 8 }, from: { x: 2, z: 8 }, state: 'burning', t: 2, burn: 60 }];
+  g.player.pos = { x: 1, z: 7 }; g.player.yaw = 2.6; g.player.flashlightOn = true; v.pitch = 0.1;
+  g.t = 0.25;
+}), 1200);
+await pose('18-kinds', () => window.__field.set((g, v) => {
+  window.__calm(g);
+  g.flares = [{ pos: { x: 0, z: 10 }, from: { x: 0, z: 10 }, state: 'burning', t: 2, burn: 60 }];
+  g.player.pos = { x: 0, z: 5 }; g.player.yaw = 0; g.player.flashlightOn = false; v.pitch = 0.02;
+  const pick = (k) => g.monsters.find((m) => m.kind === k && m.mode === 'shamble');
+  [['hunter', -2.6], ['breaker', 0], ['rammer', 2.8]].forEach(([k, x]) => { const m = pick(k); m.mode = 'stalk'; m.timer = 99; m.pos = { x, z: 11.5 }; });
+  g.t = 0.25;
+}), 1500);
+
 // Live run: unfreeze and let the sim play to catch runtime errors.
 await page.evaluate(() => { window.__field.startHeadless('LIVE'); window.__field.frozen = false; });
 await page.waitForTimeout(5000);
