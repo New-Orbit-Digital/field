@@ -441,7 +441,8 @@ test('the crowd is a mix: hunters, breakers and rammers', () => {
 
 function sendIn(s, kind) {
   quiet(s, 0);
-  const m = s.monsters.find((x) => x.kind === kind);
+  // rammers are retired from the crowd (config kinds.rammer = 0) but their code is kept: convert one to test it
+  const m = s.monsters.find((x) => x.kind === kind) || Object.assign(s.monsters.find((x) => x.kind === 'hunter'), { kind });
   m.pos = { x: 0, z: -12 };
   beginApproach(s, m);
   return m;
