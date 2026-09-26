@@ -88,4 +88,6 @@ export function onEvent(e, game) {
   if (e.type === 'radio_fixed') toast('Radio fixed. Call for help — hold E at the radio.');
   if (e.type === 'radio_called') toast('Dispatch copies. Help is on the way. Hold out.');
   if (e.type === 'monster_gone' && e.left === 0) toast('The field is quiet. Nothing left out there.');
+  if (e.type === 'lights_smashed') toast('Something smashed the lights on that side.');
+  if (e.type === 'interrupted') toast('The car lurched. Hold E again.');
 }

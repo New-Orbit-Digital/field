@@ -2,7 +2,7 @@
 // dist/field.artifact.html (claude.ai page). GitHub Pages (justbost.com/field/) needs no build:
 // it serves index.html + src/ directly. `--serve` runs a local static server at http://localhost:8000
 import * as esbuild from 'esbuild';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 
 const serve = process.argv.includes('--serve');
 const opts = {
@@ -25,11 +25,19 @@ if (serve) {
   mkdirSync('dist', { recursive: true });
   await esbuild.build(opts);
   const js = readFileSync('dist/field.js', 'utf8').replace(/<\/script/g, '<\\/script');
+  // the recorded sound effects ride along inside the single-file builds as data URLs
+  const MIME = { mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg' };
+  const sfx = {};
+  for (const f of readdirSync('src/audio/sfx')) {
+    const ext = f.split('.').pop();
+    if (MIME[ext]) sfx[f] = `data:${MIME[ext]};base64,${readFileSync(`src/audio/sfx/${f}`).toString('base64')}`;
+  }
+  const sfxScript = `<script>window.__FIELD_SFX=${JSON.stringify(sfx)};</script>\n`;
   const css = readFileSync('src/ui/styles.css', 'utf8');
   const html = readFileSync('index.html', 'utf8')
     .replace('<link rel="stylesheet" href="./src/ui/styles.css">', () => `<style>\n${css}</style>`)
     .replace(/<!-- No build step[\s\S]*?<script type="importmap">[\s\S]*?<\/script>\n/, '')
-    .replace('<script type="module" src="./src/main.js"></script>', () => `<script type="module">\n${js}\n</script>`);
+    .replace('<script type="module" src="./src/main.js"></script>', () => `${sfxScript}<script type="module">\n${js}\n</script>`);
   writeFileSync('dist/field.html', html);
   console.log(`dist/field.html ${(html.length / 1024).toFixed(0)} KB (single file, playable offline)`);
 

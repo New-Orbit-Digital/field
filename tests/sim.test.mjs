@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runHeadless, createGame, step, bearingTo, spotWorld, attackerCap, hunterCount, MODES, carDistance, reloadProgress, aimYaw, inBeam, inFlare, flareRadius, HUNTING } from '../src/sim/game.js';
+import { runHeadless, createGame, step, bearingTo, spotWorld, attackerCap, hunterCount, MODES, carDistance, reloadProgress, aimYaw, inBeam, inFlare, flareRadius, HUNTING, carToWorld, worldToCar } from '../src/sim/game.js';
+import { beginApproach, approachGoal } from '../src/sim/monster.js';
 import { idleBot, reactiveBot, objectiveBot } from '../src/sim/bots.js';
 
 const SEEDS = Array.from({ length: 40 }, (_, i) => `T${i}`);
@@ -427,6 +428,101 @@ test('crowd: many shamble at the edge of the dark; hunters break off, grow in nu
     assert.ok(maxH >= 4, `hunters never ramped up (seed ${seed}): ${maxH}`);
     assert.ok(s.events.some((e) => e.type === 'break_off'));
   }
+});
+
+// ---------- breakers and rammers ----------
+test('the crowd is a mix: hunters, breakers and rammers', () => {
+  const s = createGame('KINDS');
+  const n = (k) => s.monsters.filter((m) => m.kind === k).length;
+  assert.equal(n('hunter'), s.cfg.horde.kinds.hunter);
+  assert.equal(n('breaker'), s.cfg.horde.kinds.breaker);
+  assert.equal(n('rammer'), s.cfg.horde.kinds.rammer);
+});
+
+function sendIn(s, kind) {
+  quiet(s, 0);
+  const m = s.monsters.find((x) => x.kind === kind);
+  m.pos = { x: 0, z: -12 };
+  beginApproach(s, m);
+  return m;
+}
+
+test('breaker: left alone it walks in and smashes one side of the lights for good', () => {
+  const s = createGame('BREAK');
+  const m = sendIn(s, 'breaker');
+  s.player.pos = { x: 8, z: 8 }; s.player.yaw = 0.8; // out of the way (not in the deep dark), looking elsewhere
+  ticks(s, 60 * 15, { yaw: 0 });
+  const smashed = s.events.find((e) => e.type === 'lights_smashed' && e.id === m.id);
+  assert.ok(smashed, 'never smashed the lights');
+  const start = s.events.find((e) => e.type === 'smash_start' && e.id === m.id);
+  assert.ok(smashed.t - start.t >= s.cfg.monster.smashTime - 1e-6, 'no fair warning before the smash');
+  assert.equal(s.strobes.filter(Boolean).length, 1, 'exactly one side should be dark');
+});
+
+test('breaker: light it up while it is smashing and it runs, lights intact', () => {
+  const s = createGame('BREAK2');
+  const m = sendIn(s, 'breaker');
+  s.player.pos = { x: 8, z: 8 }; s.player.yaw = 0.8;
+  ticks(s, 60 * 15, (g) => {
+    if (m.mode === MODES.SMASH) { g.player.pos = { x: m.pos.x, z: m.pos.z + 6 }; return { yaw: Math.PI, flashlight: true }; }
+    return { yaw: 0 };
+  });
+  assert.ok(s.events.some((e) => e.type === 'smash_start' && e.id === m.id), 'never started smashing');
+  assert.ok(s.events.some((e) => e.type === 'repel' && e.id === m.id), 'the beam did not drive it off');
+  assert.deepEqual(s.strobes, [true, true]);
+});
+
+test('rammer: a hit shoves the car (within limits), interrupts the repair until you let go of E, and carries you on the roof', () => {
+  const s = createGame('RAM');
+  const m = sendIn(s, 'rammer');
+  const sp = spotWorld(s.cfg, 'radio');
+  s.player.pos = { ...sp.stand }; s.player.yaw = bearingTo(sp.stand, sp.face);
+  const before = { x: s.cfg.car.x, z: s.cfg.car.z, yaw: s.cfg.car.yaw };
+  let sawInterrupt = false;
+  ticks(s, 60 * 20, (g) => {
+    const sp2 = spotWorld(g.cfg, 'radio');
+    if (!g.events.some((e) => e.type === 'car_rammed')) { g.player.pos = { ...sp2.stand }; g.player.yaw = bearingTo(sp2.stand, sp2.face); }
+    if (g.events.some((e) => e.type === 'interrupted')) sawInterrupt = true;
+    return { yaw: g.player.yaw, interact: true };
+  });
+  const ram = s.events.find((e) => e.type === 'car_rammed');
+  assert.ok(ram, 'never rammed');
+  const wind = s.events.find((e) => e.type === 'ram_windup' && e.id === m.id);
+  assert.ok(ram.t - wind.t >= s.cfg.monster.windupTime - 1e-6, 'no fair warning before the ram');
+  assert.ok(ram.dx !== 0 || ram.dz !== 0 || ram.dyaw !== 0, 'car did not move');
+  assert.ok(sawInterrupt, 'repair was not interrupted');
+  const progress = s.radio.repair;
+  ticks(s, 60, { yaw: s.player.yaw, interact: true });
+  assert.equal(s.radio.repair, progress, 'kept repairing without letting go of E');
+  assert.ok(Math.hypot(s.cfg.car.x, s.cfg.car.z) <= s.cfg.car.maxDrift + 1e-9);
+  assert.ok(Math.abs(s.cfg.car.yaw - before.yaw) <= s.cfg.car.maxTurn + 1e-9);
+
+  // on the roof: you move with the car (or go over the side)
+  const r = createGame('RAM2');
+  const m2 = sendIn(r, 'rammer');
+  r.player.pos = { x: 0.3, z: 0 }; r.player.y = r.cfg.car.top; r.player.onCar = true; r.player.grounded = true;
+  const localBefore = worldToCar(r.cfg, r.player.pos);
+  ticks(r, 60 * 20, (g) => (g.events.some((e) => e.type === 'car_rammed') ? { yaw: 0 } : { yaw: 0 }));
+  const hit = r.events.find((e) => e.type === 'car_rammed');
+  assert.ok(hit, 'never rammed');
+  const fell = r.events.some((e) => e.type === 'knocked_off' && e.by === 'ram');
+  if (!fell) {
+    const l = worldToCar(r.cfg, r.player.pos);
+    assert.ok(Math.hypot(l.x - localBefore.x, l.z - localBefore.z) < 0.05, 'the roof did not carry you');
+  }
+  assert.ok(r.events.some((e) => e.type === 'stagger' || (e.type === 'knocked_off' && e.by === 'ram')));
+});
+
+test('the car can move: car-local and world coordinates stay consistent, and the pickup spots move with it', () => {
+  const s = createGame('POSE');
+  const a = spotWorld(s.cfg, 'radio').stand;
+  s.cfg.car.x = 0.8; s.cfg.car.z = -0.5; s.cfg.car.yaw += 0.2;
+  const p = { x: 3.1, z: -1.7 };
+  const back = carToWorld(s.cfg, worldToCar(s.cfg, p));
+  assert.ok(Math.hypot(back.x - p.x, back.z - p.z) < 1e-9);
+  const b = spotWorld(s.cfg, 'radio').stand;
+  assert.ok(Math.hypot(a.x - b.x, a.z - b.z) > 0.5, 'spot did not follow the car');
+  assert.ok(carDistance(s.cfg, { x: 0.8, z: -0.5 }) < 0, 'car centre should be inside the hull');
 });
 
 // ---------- battery ----------

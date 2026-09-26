@@ -2,7 +2,7 @@
 // the muzzle flash, and the world point the aim dot is projected from.
 import * as THREE from 'three';
 import { forward, aimYaw } from '../sim/game.js';
-import { buildPlayer } from './player.js';
+import { buildPlayer, posePlayer } from './player.js';
 
 export function createPlayerRig(scene, cfg) {
   const player = buildPlayer();
@@ -13,13 +13,14 @@ export function createPlayerRig(scene, cfg) {
   flash.shadow.camera.near = 0.3;
   const muzzle = new THREE.PointLight(0xffc070, 0, 12, 1.5);
   scene.add(flash, flash.target, muzzle);
-  let muzzleT = 0;
+  let muzzleT = 0, walk = 0, aimK = 0, lastShot = -9;
   const aimPoint = new THREE.Vector3();
+  const lastPos = { x: 0, z: 0 };
 
   return {
     aimPoint,
     onEvent(e) {
-      if (e.type === 'shot') muzzleT = 0.06;
+      if (e.type === 'shot') { muzzleT = 0.06; lastShot = e.t; }
     },
     // Returns the player's visual height (used by the camera).
     update(state, view, dt) {
@@ -27,10 +28,16 @@ export function createPlayerRig(scene, cfg) {
       const py = P.mantle > 0 ? cfg.car.top * (1 - P.mantle / cfg.player.mantleTime) : P.y;
       player.group.position.set(P.pos.x, py, P.pos.z);
       player.group.rotation.y = P.yaw;
-      const bob = view.moving && P.grounded ? Math.abs(Math.sin(t * 9)) * 0.05 : Math.sin(t * 2) * 0.01;
-      player.body.position.y = 0.85 + bob;
-      player.body.rotation.x = P.mantle > 0 ? 0.5 : 0;
-      player.arm.rotation.x = P.reloading > 0 ? -0.4 + Math.sin(t * 14) * 0.15 : P.interacting ? -0.6 : -1.2;
+      // walk cycle driven by how far you actually moved
+      const moved = Math.hypot(P.pos.x - lastPos.x, P.pos.z - lastPos.z);
+      lastPos.x = P.pos.x; lastPos.z = P.pos.z;
+      const speed = P.grounded && moved < 0.5 ? Math.min(1, moved / Math.max(dt, 1e-3) / cfg.player.speed) : 0;
+      walk += moved * 5.2;
+      // arms come up to aim with the light on, or just after a shot
+      const wantAim = P.flashlightOn || t - lastShot < 1.2 ? 1 : 0;
+      aimK += (wantAim - aimK) * Math.min(1, dt * 10);
+      posePlayer(player, { phase: walk, speed, aim: aimK, reloading: P.reloading > 0, interacting: P.interacting, mantling: P.mantle > 0, t });
+      player.lens.material.emissiveIntensity = P.flashlightOn ? 4 : 0;
       player.group.visible = !(P.invuln > 0 && Math.floor(t * 20) % 2 === 0);
 
       const f = forward(P.yaw);

@@ -11,7 +11,7 @@ import { createSnowMarks } from './snowMarks.js';
 import { createImpacts } from './impacts.js';
 import { createPuffs, createExhaust } from './puffs.js';
 import { createTracks } from './tracks.js';
-import { carToWorld, forward } from '../sim/game.js';
+import { carToWorld, carDirToWorld, forward } from '../sim/game.js';
 import { buildSnow } from './snow.js';
 import { createFollowCamera } from './followCamera.js';
 import { buildDebugRings } from './debugRings.js';
@@ -48,11 +48,8 @@ export function createWorld(canvas, cfg) {
   const puffs = createPuffs(scene);
   const copExhaust = createExhaust(puffs, { rate: 3, speed: 0.45, size1: 0.8, alpha: 0.6 });
   const truckExhaust = createExhaust(puffs, { rate: 4, speed: 0.6, size1: 1.3, alpha: 0.6 });
-  // the cop car's tailpipe: under the rear bumper, which is now up by the upturned chassis
-  const cp = carToWorld(cfg, { x: -cfg.car.halfLength - 0.05, z: 0.5 });
-  const copPipe = new THREE.Vector3(cp.x, cfg.car.top - 0.3, cp.z);
-  const cd = carToWorld(cfg, { x: -1, z: 0 });
-  const copDir = new THREE.Vector3(cd.x, 0, cd.z).normalize();
+  // the cop car's tailpipe: under the rear bumper, which is now up by the upturned chassis (follows the car)
+  const copPipe = new THREE.Vector3(), copDir = new THREE.Vector3();
   const truckPipe = new THREE.Vector3(), truckDir = new THREE.Vector3();
   let breathT = 1.5, lastHitT = -99;
   const tracks = createTracks(marks);
@@ -65,6 +62,7 @@ export function createWorld(canvas, cfg) {
 
   function onEvent(e) {
     cam.onEvent(e);
+    carRig.onEvent(e);
     playerRig.onEvent(e);
     beasts.onEvent(e);
     impacts.onEvent(e);
@@ -73,14 +71,17 @@ export function createWorld(canvas, cfg) {
   }
 
   function update(state, view, dt) {
-    carRig.update(state);
+    carRig.update(state, view.hazardOn, dt);
     const py = playerRig.update(state, view, dt);
     beasts.update(state, dt);
     flares.update(state, dt);
     impacts.update(dt);
     tracks.update(state);
     marks.update(dt);
-    landmark.setDistance(state.radio.rescueDist); // parked up on the bank until called, then drives in
+    landmark.setDistance(cfg.arena.landmarkDistance); // your car, parked up on the bank (the rescue is just a timer for now)
+    const cp = carToWorld(state.cfg, { x: -cfg.car.halfLength - 0.1, z: 0.45 });
+    const cd = carDirToWorld(state.cfg, { x: -1, z: 0 });
+    copPipe.set(cp.x, 1.58, cp.z); copDir.set(cd.x, 0, cd.z);
     copExhaust.update(dt, copPipe, copDir);
     landmark.tailpipe(truckPipe, truckDir);
     truckExhaust.update(dt, truckPipe, truckDir);

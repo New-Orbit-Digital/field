@@ -1,5 +1,5 @@
 // Debug overlay (toggle with `): per-monster state readout and a player-centred minimap.
-import { bearingTo, inDeepDark, monsterVisible, spotWorld, attackerCap, hunterCount, wrapAngle } from '../sim/game.js';
+import { bearingTo, carToWorld, inDeepDark, monsterVisible, spotWorld, attackerCap, hunterCount, wrapAngle } from '../sim/game.js';
 import { $ } from './dom.js';
 
 let mctx = null;
@@ -9,12 +9,12 @@ export function renderDebug(game, seed) {
   const lines = [
     `seed ${seed}   t ${game.t.toFixed(1)}s   phase ${game.radio.phase}   deep ${inDeepDark(game)}`,
     `crowd ${game.monsters.length}/${cfg.horde.crowd}   hunting ${hunterCount(game)}/${game.hordeTarget}   attacker cap ${attackerCap(game)}   flares burning ${game.flares.length}   next flare ${Math.max(0, game.flareReadyAt - game.t).toFixed(0)}s`,
-    `battery ${P.battery.toFixed(0)}  hp ${P.health}  mag ${P.mag}/${P.reserve}  y ${P.y.toFixed(2)}  onCar ${P.onCar}  spot ${P.activeSpot || '-'}`,
+    `lights ${game.strobes.map((x) => (x ? 'ok' : 'SMASHED')).join('/')}   car ${cfg.car.x.toFixed(2)},${cfg.car.z.toFixed(2)} ${((cfg.car.yaw - (cfg.car.yaw0 ?? cfg.car.yaw)) * 180 / Math.PI).toFixed(1)}°   battery ${P.battery.toFixed(0)}  hp ${P.health}  mag ${P.mag}/${P.reserve}  y ${P.y.toFixed(2)}  onCar ${P.onCar}  spot ${P.activeSpot || '-'}`,
   ];
   for (const m of game.monsters) {
     if (m.mode === 'shamble') continue;
     const rel = wrapAngle(bearingTo(P.pos, m.pos) - P.yaw);
-    lines.push(`#${m.id} ${m.mode.padEnd(7)} rel ${(rel * 180 / Math.PI).toFixed(0).padStart(4)}°  d ${Math.hypot(m.pos.x - P.pos.x, m.pos.z - P.pos.z).toFixed(1).padStart(5)}  vis ${monsterVisible(game, m) ? 'Y' : '-'}  beam ${m.beamAccum.toFixed(2)}${m.wounds ? ' W' + m.wounds : ''}${m.deep ? ' DEEP' : ''}`);
+    lines.push(`#${m.id} ${m.kind[0].toUpperCase()} ${m.mode.padEnd(8)} rel ${(rel * 180 / Math.PI).toFixed(0).padStart(4)}°  d ${Math.hypot(m.pos.x - P.pos.x, m.pos.z - P.pos.z).toFixed(1).padStart(5)}  vis ${monsterVisible(game, m) ? 'Y' : '-'}  beam ${m.beamAccum.toFixed(2)}${m.wounds ? ' W' + m.wounds : ''}${m.deep ? ' DEEP' : ''}`);
   }
   $('debugText').textContent = lines.join('\n');
 
@@ -38,9 +38,7 @@ export function renderDebug(game, seed) {
   mctx.fillStyle = '#888';
   mctx.beginPath();
   for (const [lx, lz] of [[1, 1], [1, -1], [-1, -1], [-1, 1]]) {
-    const c = Math.cos(cfg.car.yaw), s = Math.sin(cfg.car.yaw);
-    const px = lx * cfg.car.halfLength, pz = lz * cfg.car.halfWidth;
-    const [mx, my] = toMap({ x: px * c + pz * s, z: -px * s + pz * c });
+    const [mx, my] = toMap(carToWorld(cfg, { x: lx * cfg.car.halfLength, z: lz * cfg.car.halfWidth }));
     mctx.lineTo(mx, my);
   }
   mctx.fill();
@@ -59,7 +57,7 @@ export function renderDebug(game, seed) {
   mctx.arc(W / 2, W / 2, 16 * S, -Math.PI / 2 - h, -Math.PI / 2 + h); mctx.fill();
   mctx.fillStyle = '#9cf';
   mctx.beginPath(); mctx.arc(W / 2, W / 2, 4, 0, Math.PI * 2); mctx.fill();
-  const colors = { shamble: '#444', stalk: '#999', probe: '#fc3', warn: '#f80', commit: '#f22', climb: '#f0f', retreat: '#6af', gone: '#a33' };
+  const colors = { shamble: '#444', stalk: '#999', probe: '#fc3', warn: '#f80', commit: '#f22', climb: '#f0f', retreat: '#6af', gone: '#a33', approach: '#c9f', smash: '#f5f', windup: '#fa6', ram: '#f60' };
   for (const m of game.monsters) {
     const [mx, my] = toMap(m.pos);
     mctx.fillStyle = colors[m.mode];

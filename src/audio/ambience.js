@@ -62,11 +62,13 @@ export function createAmbience({ ctx, master, noiseBuf }) {
     radioTimer -= dt;
     if (radioTimer <= 0) { radioTimer = 6 + Math.random() * 14; radioBurst(); }
     rsGain.gain.setTargetAtTime(atRadio ? 0.09 : 0, ctx.currentTime, 0.05);
-    if (siren && state.radio.rescueDist != null) {
-      const b = state.cfg.arena.landmarkBearing, d = state.radio.rescueDist;
+    if (siren && state.radio.rescueLeft != null) {
+      // far off and getting closer — heard, not seen (there's no rescue vehicle on screen for now)
+      const b = state.cfg.arena.landmarkBearing + 1.3, d = 90;
       const x = Math.sin(b) * d, z = Math.cos(b) * d;
       if (siren.pn.positionX) { siren.pn.positionX.value = x; siren.pn.positionZ.value = z; } else siren.pn.setPosition(x, 1, z);
-      siren.g.gain.value = 0.05 + 0.15 * (1 - d / state.cfg.arena.landmarkDistance);
+      const k = 1 - Math.max(0, state.radio.rescueLeft) / state.cfg.radio.rescueTime;
+      siren.g.gain.value = 0.05 + 0.2 * k;
     }
   }
 

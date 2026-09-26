@@ -34,7 +34,7 @@ const players = {
 };
 for (const [name, make] of Object.entries(players)) {
   let wins = 0; const deathPhase = {}; const winT = []; const fixedAt = [], calledAt = [];
-  let ammoTrips = 0, flareThrows = 0, gone = 0, hits = 0;
+  let ammoTrips = 0, flareThrows = 0, gone = 0, hits = 0, rams = 0, smashed = 0, interrupts = 0;
   for (const s of seeds) {
     const g = runHeadless(s, make(), { maxTime: 900 });
     if (g.won) { wins++; winT.push(g.t); } else deathPhase[g.radio.phase] = (deathPhase[g.radio.phase] || 0) + 1;
@@ -45,8 +45,11 @@ for (const [name, make] of Object.entries(players)) {
       if (e.type === 'flare_throw') flareThrows++;
       if (e.type === 'monster_gone') gone++;
       if (e.type === 'hit') hits++;
+      if (e.type === 'car_rammed') rams++;
+      if (e.type === 'lights_smashed') smashed++;
+      if (e.type === 'interrupted') interrupts++;
     }
   }
   const dp = Object.entries(deathPhase).map(([k, v]) => `${k} ${v}`).join(', ') || '—';
-  console.log(`${name.padEnd(28)} win ${(100 * wins / N).toFixed(0).padStart(3)}% | median win ${winT.length ? pct(winT, 0.5).toFixed(0) + 's' : '—'} | deaths by phase: ${dp} | radio fixed@${fixedAt.length ? pct(fixedAt, 0.5).toFixed(0) : '—'}s called@${calledAt.length ? pct(calledAt, 0.5).toFixed(0) : '—'}s | ammo trips/run ${(ammoTrips / N).toFixed(1)} flares/run ${(flareThrows / N).toFixed(1)} | hits taken/run ${(hits / N).toFixed(1)} | driven off for good/run ${(gone / N).toFixed(1)}`);
+  console.log(`${name.padEnd(28)} win ${(100 * wins / N).toFixed(0).padStart(3)}% | median win ${winT.length ? pct(winT, 0.5).toFixed(0) + 's' : '—'} | deaths by phase: ${dp} | radio fixed@${fixedAt.length ? pct(fixedAt, 0.5).toFixed(0) : '—'}s called@${calledAt.length ? pct(calledAt, 0.5).toFixed(0) : '—'}s | ammo trips/run ${(ammoTrips / N).toFixed(1)} flares/run ${(flareThrows / N).toFixed(1)} | hits taken/run ${(hits / N).toFixed(1)} | driven off for good/run ${(gone / N).toFixed(1)} | rams/run ${(rams / N).toFixed(1)} interrupts/run ${(interrupts / N).toFixed(1)} lights smashed/run ${(smashed / N).toFixed(1)}`);
 }
