@@ -5,8 +5,9 @@ import { $, fmt, KEY } from './dom.js';
 
 // Prompt text when you're standing at a car spot and facing it.
 const PROMPTS = {
-  radio: (g) => g.radio.phase === 'repair' ? `${KEY('E')} Repair the radio` : g.radio.phase === 'call' ? `${KEY('E')} Call for help` : 'Radio: waiting on dispatch',
-  ammo: (g) => g.player.reserve < g.cfg.pistol.maxReserve ? `${KEY('E')} Grab ammo` : 'Ammo full',
+  radio: (g) => g.hazards.fire && g.hazards.fire.stage >= 2 ? 'Too hot — the fire has reached the radio' : g.radio.phase === 'repair' ? `${KEY('E')} Repair the radio` : g.radio.phase === 'call' ? `${KEY('E')} Call for help` : 'Radio: waiting on dispatch',
+  ammo: (g) => g.hazards.fire && g.hazards.fire.stage >= 3 ? 'The trunk is on fire' : g.hazards.fire && !g.player.hasExtinguisher ? `${KEY('E')} Grab the extinguisher` : g.player.reserve < g.cfg.pistol.maxReserve ? `${KEY('E')} Grab ammo` : 'Ammo full',
+  fire: (g) => g.player.extinguisher > 0 ? `${KEY('E')} Spray the extinguisher · ${Math.round(100 * g.player.extinguisher / g.cfg.hazards.fire.extinguisherCharge)}%` : g.player.hasExtinguisher ? `${KEY('E')} Kick snow on it — the extinguisher's empty` : `${KEY('E')} Kick snow on the fire — there's an extinguisher in the trunk`,
   flares: (g) => g.player.flares >= g.cfg.flares.carryMax ? 'Already holding a flare' : g.t < g.flareReadyAt ? `Digging out the next flare… ${Math.ceil(g.flareReadyAt - g.t)}s` : `${KEY('E')} Take a flare`,
 };
 let lastPrompt = null, lastAmmo = null, lastFlare = null;
@@ -32,12 +33,28 @@ export function update(game, phase, world) {
   const flareHtml = P.flares > 0 ? `<span class="hint flare">${KEY('Q')} drop flare</span>` : '';
   if (flareHtml !== lastFlare) { $('flare').innerHTML = flareHtml; lastFlare = flareHtml; }
 
-  // interaction prompt at the car
-  const prompt = P.activeSpot ? PROMPTS[P.activeSpot](game) : P.onCar ? 'On the roof — you can see further, but you can\'t reach anything from up here' : '';
+  // hazards: a status line under the objective, the warmth bar, frost at the edges
+  const hz = game.hazards, bits = [];
+  if (hz.fire) bits.push(`FIRE · ${Math.ceil(hz.fire.fuse)}s`);
+  if (hz.gust && hz.gust.phase === 'blow') bits.push('WHITEOUT');
+  $('hazardLine').textContent = bits.join('   ');
+  $('warmWrap').hidden = !hz.cold;
+  if (hz.cold) {
+    $('warmFill').style.width = `${(100 * P.heat / cfg.hazards.cold.max).toFixed(1)}%`;
+    $('warm').classList.toggle('numb', !!hz.cold.numb);
+  }
+  $('frost').style.opacity = hz.cold ? String(Math.max(0, 1 - P.heat / (cfg.hazards.cold.max * 0.5)).toFixed(2)) : '0';
+
+  // interaction prompt at the car (a grab overrides everything)
+  const held = P.held != null ? (P.held === 'crawler' ? 'Something has your ankle' : `${KEY('A')} ${KEY('D')} ${KEY('A')} ${KEY('D')} break free — or shoot it`) : null;
+  $('prompt').classList.toggle('urgent', !!held);
+  const prompt = held || (P.activeSpot ? PROMPTS[P.activeSpot](game) : P.onCar ? 'On the roof — you can see further, but you can\'t reach anything from up here' : '');
   if (prompt !== lastPrompt) { $('prompt').innerHTML = prompt; lastPrompt = prompt; }
   let prog = 0;
   if (P.interacting) {
     if (P.activeSpot === 'radio') prog = R.phase === 'repair' ? R.repair / cfg.radio.repairTime : R.call / cfg.radio.callTime;
+    else if (P.activeSpot === 'fire') prog = game.hazards.fire ? game.hazards.fire.douse / cfg.hazards.fire.douse : 1;
+    else if (P.activeSpot === 'ammo' && game.hazards.fire && !P.hasExtinguisher) prog = P.hold / cfg.hazards.fire.extinguisherPickup;
     else prog = P.hold / (P.activeSpot === 'ammo' ? cfg.pistol.pickupTime : cfg.flares.pickupTime);
   }
   $('progress').hidden = !P.interacting;
@@ -90,4 +107,17 @@ export function onEvent(e, game) {
   if (e.type === 'monster_gone' && e.left === 0) toast('The field is quiet. Nothing left out there.');
   if (e.type === 'lights_smashed') toast('Something smashed the lights on that side.');
   if (e.type === 'interrupted') toast('The car lurched. Hold E again.');
+  const HZ_TOASTS = {
+    fire_start: 'Fuel\'s caught at the engine. Put it out before it reaches the tank.',
+    fire_spread: 'The fire is spreading.', fire_out: 'The fire\'s out.',
+    extinguisher_pickup: 'Got the extinguisher.', extinguisher_empty: 'The extinguisher is empty.',
+    swarm_start: 'Something small, lots of them — drawn to your light.', swarm_scattered: 'The swarm scatters.',
+    tentacle_start: 'Something is sliding over the snow, along your tracks.', tentacle_severed: 'You shot it loose.', tentacle_escaped: 'You tore free.',
+    cold_start: 'It\'s getting colder. Keep moving; stay near the heat.', cold_numb: 'You can\'t feel your legs.',
+    gust_warn: 'The wind is picking up…',
+    statue_start: 'Something out there. It moves when you look away.',
+    crawler_tell: 'Something under the car!', crawler_repelled: 'It pulls back under the car.',
+    ricochet: 'The bullet does nothing to it.',
+  };
+  if (HZ_TOASTS[e.type]) toast(HZ_TOASTS[e.type]);
 }
