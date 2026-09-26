@@ -15,7 +15,10 @@ import { carToWorld, carDirToWorld, forward } from '../sim/game.js';
 import { buildSnow } from './snow.js';
 import { createFollowCamera } from './followCamera.js';
 import { buildDebugRings } from './debugRings.js';
+import { createHazardRig } from './hazardRig.js';
 import { psxEnabled, installVertexSnap, createPsxPass } from './psx.js';
+import { loadModels, loadedModels } from './assets.js';
+import { createScenery } from './scenery.js';
 
 export function createWorld(canvas, cfg) {
   const psxOn = psxEnabled();
@@ -47,6 +50,9 @@ export function createWorld(canvas, cfg) {
   const debugRings = buildDebugRings(cfg);
   scene.add(landmark.group, ...landmark.lights, snow.points, debugRings);
   const cam = createFollowCamera();
+  const hazardRig = createHazardRig(scene, cfg);
+  const scenery = createScenery(scene, cfg);   // dead trees + zombies at the edge (once their models load)
+  const modelsReady = loadModels();              // every rig starts procedural and swaps as models arrive
 
   // vapour: both engines idling, and your breath in the cold
   const puffs = createPuffs(scene);
@@ -82,6 +88,7 @@ export function createWorld(canvas, cfg) {
     carRig.update(state, view.hazardOn, dt);
     const py = playerRig.update(state, view, dt);
     beasts.update(state, dt);
+    scenery.update(state, dt);
     flares.update(state, dt);
     impacts.update(dt);
     tracks.update(state);
@@ -95,7 +102,8 @@ export function createWorld(canvas, cfg) {
     truckExhaust.update(dt, truckPipe, truckDir);
     breathe(state, view, py, dt);
     puffs.update(dt, cam.camera);
-    snow.update(dt, state.player.pos);
+    const gust = hazardRig.update(state, dt, scene.fog);
+    snow.update(dt, state.player.pos, gust);
     cam.update(state, view, py, dt);
     debugRings.visible = view.debug;
     if (psx) psx.render(scene, cam.camera);
@@ -125,7 +133,7 @@ export function createWorld(canvas, cfg) {
   }
 
   resize();
-  function reset() { beasts.reset(); marks.reset(); tracks.reset(); }
+  function reset() { beasts.reset(); marks.reset(); tracks.reset(); hazardRig.reset(); scenery.reset(); }
 
-  return { renderer, psx: psxOn, scene, camera: cam.camera, update, resize, onEvent, reset, aimScreen };
+  return { renderer, psx: psxOn, scene, camera: cam.camera, update, resize, onEvent, reset, aimScreen, modelsReady, loadedModels, playerRig, scenery };
 }

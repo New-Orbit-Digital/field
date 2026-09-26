@@ -4,6 +4,8 @@
 // A breaker can smash one side's strobe for good: that side goes dark and there's glass in the snow.
 import * as THREE from 'three';
 import { buildCopCar, buildShards } from './copCar.js';
+import { buildCopCarModel, buildGlassModel } from './copCarModel.js';
+import { onModel } from './assets.js';
 
 function sideStrobe(cfg, side) {
   const light = new THREE.SpotLight(0xff1a1a, 0, 24, THREE.MathUtils.degToRad(82), 0.55, 1.3);
@@ -55,6 +57,22 @@ export function createCarRig(scene, cfg) {
   for (const s of strobes) root.add(s, s.target);
   const shards = [buildShards(+1), buildShards(-1)];
   root.add(...shards);
+
+  // Loaded models replace the procedural shell (the strobe lenses, hazard lamps and underside frame stay:
+  // they carry the lights, and the frame is what you stand on) and the glass.
+  onModel((key, gltf) => {
+    if (key === 'copCar') {
+      car.model.traverse((o) => {
+        if (o.isMesh && !o.userData.under && !car.bars.includes(o) && !car.hazards.includes(o)) o.visible = false;
+      });
+      root.add(buildCopCarModel(gltf, cfg));
+    } else if (key === 'glass') {
+      shards.forEach((sh, i) => {
+        sh.clear();
+        sh.add(buildGlassModel(gltf, i === 0 ? +1 : -1));
+      });
+    }
+  });
 
   // hazards: one small amber light at each front corner (no shadows — they're weak)
   const hazards = [+1, -1].map((zs) => {

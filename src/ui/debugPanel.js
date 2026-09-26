@@ -11,6 +11,18 @@ export function renderDebug(game, seed) {
     `crowd ${game.monsters.length}/${cfg.horde.crowd}   hunting ${hunterCount(game)}/${game.hordeTarget}   attacker cap ${attackerCap(game)}   flares burning ${game.flares.length}   next flare ${Math.max(0, game.flareReadyAt - game.t).toFixed(0)}s`,
     `lights ${game.strobes.map((x) => (x ? 'ok' : 'SMASHED')).join('/')}   car ${cfg.car.x.toFixed(2)},${cfg.car.z.toFixed(2)} ${((cfg.car.yaw - (cfg.car.yaw0 ?? cfg.car.yaw)) * 180 / Math.PI).toFixed(1)}°   battery ${P.battery.toFixed(0)}  hp ${P.health}  mag ${P.mag}/${P.reserve}  y ${P.y.toFixed(2)}  onCar ${P.onCar}  spot ${P.activeSpot || '-'}`,
   ];
+  const hz = game.hazards;
+  const hzBits = [
+    hz.fire && `fire s${hz.fire.stage} fuse ${hz.fire.fuse.toFixed(0)}`,
+    hz.swarm && `swarm ${hz.swarm.count} ${hz.swarm.target}`,
+    hz.tentacles.length && `tentacles ${hz.tentacles.map((t) => t.state[0] + t.alt).join(',')}`,
+    hz.cold && `heat ${P.heat.toFixed(0)}${hz.cold.numb ? ' NUMB' : ''}`,
+    hz.gust && `gust ${hz.gust.phase}`,
+    hz.statue && `statue ${hz.statue.moving ? 'moving' : 'frozen'}`,
+    hz.crawler && `crawler ${hz.crawler.state}`,
+    P.held != null && `HELD ${P.held}`,
+  ].filter(Boolean);
+  if (hzBits.length) lines.push('hazards: ' + hzBits.join('   '));
   for (const m of game.monsters) {
     if (m.mode === 'shamble') continue;
     const rel = wrapAngle(bearingTo(P.pos, m.pos) - P.yaw);

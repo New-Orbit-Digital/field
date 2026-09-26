@@ -190,25 +190,33 @@ export function buildCopCar(cfg) {
   // underside (the part you stand on): frame rails, crossmembers, axles, tank, driveshaft, exhaust
   for (const zs of [-0.52, 0.52]) {
     const rail = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.08, 0.12), under);
+    rail.userData.under = true;
     rail.position.set(0, 0.34, zs); car.add(rail);
   }
   for (const x of [-1.9, -0.6, 0.6, 1.9]) {
     const cm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.06, 1.1), under);
+    cm.userData.under = true;
     cm.position.set(x, 0.35, 0); car.add(cm);
   }
   for (const x of [-1.45, 1.45]) {
     const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.5, 8), under);
+    axle.userData.under = true;
     axle.rotation.x = Math.PI / 2; axle.position.set(x, 0.38, 0); car.add(axle);
   }
   const tank = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.18, 0.9), under);
+  tank.userData.under = true;
   tank.position.set(0.95, 0.4, -0.05); car.add(tank);
   const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 2.5, 8), under);
+  shaft.userData.under = true;
   shaft.rotation.z = Math.PI / 2; shaft.position.set(0.05, 0.36, 0); car.add(shaft);
   const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3.9, 8), under);
+  pipe.userData.under = true;
   pipe.rotation.z = Math.PI / 2; pipe.position.set(0.45, 0.36, 0.45); car.add(pipe);
   const muffler = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.6, 12), under);
+  muffler.userData.under = true;
   muffler.rotation.z = Math.PI / 2; muffler.position.set(1.8, 0.37, 0.45); car.add(muffler);
   const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.16, 10, 1, true), chrome);
+  tip.userData.under = true;
   tip.rotation.z = Math.PI / 2; tip.position.set(2.42, 0.36, 0.45); car.add(tip);
 
   // light bar, crushed between the roof and the snow; red and blue lenses face out of both sides
@@ -229,7 +237,7 @@ export function buildCopCar(cfg) {
   }
   outer.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
   ws.castShadow = false;
-  return { group: outer, bars, hazards };
+  return { group: outer, model: car, bars, hazards };
 }
 
 // Glass from a smashed light bar, scattered on the snow on that side (car-local, flipped frame).

@@ -18,9 +18,9 @@ export function buildSnow() {
   let time = 0;
   return {
     points,
-    update(dt, c) {
+    update(dt, c, gust = 0) {
       time += dt;
-      const wind = Math.sin(time * 0.3) * 0.6 + 0.4;
+      const wind = (Math.sin(time * 0.3) * 0.6 + 0.4) * (1 - gust) + gust * 9; // a gust drives it sideways
       for (let i = 0; i < N; i++) {
         let x = p[i * 3], y = p[i * 3 + 1], z = p[i * 3 + 2];
         y -= speed[i] * dt;

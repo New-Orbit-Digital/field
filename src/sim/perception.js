@@ -1,6 +1,7 @@
 // What can be seen and lit: view cone, flashlight beam (with recoil waver), flares, the dim play area, the deep dark.
 // There's no circle of light at the wreck any more: the far headlights and the strobes only light it dimly.
 import { bearingTo, dist, len, wrapAngle } from './math.js';
+import { fireLight } from './hazards/fire.js';
 
 export function inViewGeometry(state, pos) {
   const { player, cfg } = state;
@@ -14,7 +15,7 @@ export function inViewGeometry(state, pos) {
 // Where the gun and flashlight actually point: facing plus recoil waver.
 export function aimYaw(state) {
   const P = state.player;
-  return wrapAngle(P.yaw + P.recoil * Math.sin(P.recoilPhase));
+  return wrapAngle(P.yaw + P.recoil * Math.sin(P.recoilPhase) + (P.aimShake || 0) * Math.sin(P.shakePhase || 0));
 }
 
 export function inBeam(state, pos) {
@@ -33,6 +34,7 @@ export function beamOffset(state, pos) {
 
 // A flare's reach: its full radius, shrinking as it gutters out over its last few seconds (matching the light).
 export function flareRadius(state, f) {
+  if (f.fire) return f.radius; // the wreck on fire is a light too
   const fc = state.cfg.flares;
   const left = f.burn - f.t;
   return left >= fc.gutterTime ? fc.radius : fc.radius * Math.sqrt(Math.max(0, left / fc.gutterTime));
@@ -40,6 +42,8 @@ export function flareRadius(state, f) {
 
 export function inFlare(state, pos, pad = 0) {
   for (const f of state.flares) if (f.state === 'burning' && dist(f.pos, pos) < flareRadius(state, f) + pad) return f;
+  const L = fireLight(state);
+  if (L && dist(L.pos, pos) < L.radius + pad) return L;
   return null;
 }
 

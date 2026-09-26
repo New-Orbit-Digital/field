@@ -4,6 +4,7 @@ import { bearingTo, dist, forward, wrapAngle } from './math.js';
 import { bulletScare, woundMonster } from './monster.js';
 import { MODES } from './modes.js';
 import { aimYaw } from './perception.js';
+import { hazardTargets } from './hazards/index.js';
 
 export function reloadProgress(P) {
   return P.reloadTotal > 0 ? 1 - P.reloading / P.reloadTotal : 0;
@@ -43,6 +44,21 @@ export function fire(state) {
     const tol = cfg.pistol.aimTolerance + Math.atan(cfg.pistol.bodyRadius / d);
     const rel = Math.abs(wrapAngle(bearingTo(P.pos, m.pos) - aim));
     if (rel <= tol && d < bestD) { best = m; bestD = d; }
+  }
+  // hazards in the line of fire (swarm, tentacles, the statue): the nearer of those and the best monster takes it
+  let hz = null, hzD = Infinity;
+  for (const h of hazardTargets(state)) {
+    const d = dist(P.pos, h.pos);
+    if (d > cfg.pistol.range || d < 0.01) continue;
+    const tol = cfg.pistol.aimTolerance + Math.atan(h.radius / d);
+    if (Math.abs(wrapAngle(bearingTo(P.pos, h.pos) - aim)) <= tol && d < hzD) { hz = h; hzD = d; }
+  }
+  if (hz && hzD < bestD) {
+    emit(state, 'shot', { hit: null, hazard: true, mag: P.mag });
+    emit(state, 'bullet_impact', { pos: { ...hz.pos }, hit: null });
+    hz.onHit();
+    bulletScare(state, hz.pos, null);
+    return;
   }
   emit(state, 'shot', { hit: best ? best.id : null, mag: P.mag });
   // where the bullet ends up: in the monster, or in the snow further out

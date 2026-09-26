@@ -10,7 +10,9 @@
     "test": "node --test tests/*.test.mjs",
     "sim": "node tools/simreport.mjs",
     "shots": "node tools/screenshots.mjs",
-    "pages-check": "node tools/pages-check.mjs"
+    "pages-check": "node tools/pages-check.mjs",
+    "hazard-shots": "node tools/hazard-shots.mjs",
+    "model-shots": "node tools/model-shots.mjs"
   },
   "dependencies": {
     "three": "0.186.1"

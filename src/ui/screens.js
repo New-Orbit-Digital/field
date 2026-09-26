@@ -21,7 +21,9 @@ export function showGameOver(game, seed, best) {
   const repels = game.events.filter((e) => e.type === 'repel' || e.type === 'shot_hit').length;
   $('overRepels').textContent = String(repels);
   const ph = game.radio.phase;
-  $('overPhase').textContent = game.won ? `${game.monsters.length} of them out there when help arrived`
+  $('overPhase').textContent = game.deathCause === 'explosion' ? 'The car went up with you next to it'
+    : game.deathCause === 'dragged' ? 'Dragged off into the dark'
+    : game.won ? `${game.monsters.length} of them out there when help arrived`
     : ph === 'repair' ? `Radio ${Math.floor(100 * game.radio.repair / game.cfg.radio.repairTime)}% repaired`
     : ph === 'call' ? 'Radio fixed — never got the call out'
     : `Help was ${Math.ceil(game.radio.rescueLeft)}s away`;

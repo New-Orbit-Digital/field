@@ -188,6 +188,7 @@ export function animateBeast(v, m, state, dt) {
     if (paw) { paw.hip.rotation.x = -0.6 + Math.sin(t * 9) * 0.5; paw.knee.rotation.x = 1.1; }
   } else if (mode === MODES.RAM) { crouch = -0.2; pitch = 0.4; }
   else if (mode === MODES.SHAMBLE && !scattering) { crouch = -0.08; pitch = 0.16 + Math.sin(t * 0.7 + v.tiltT) * 0.05; } // head hung, swaying
+  crouch *= v.crouchScale ?? 1; // models are one rigid piece: dropping them much sinks them into the snow
   v.body.position.y += (crouch - v.body.position.y) * Math.min(1, dt * 8);
   v.body.rotation.x += (pitch - v.body.rotation.x) * Math.min(1, dt * 8);
   v.flinch = Math.max(0, v.flinch - dt);
@@ -210,4 +211,6 @@ export function animateBeast(v, m, state, dt) {
     : mode === MODES.WARN || mode === MODES.COMMIT || mode === MODES.CLIMB || mode === MODES.SMASH || mode === MODES.WINDUP || mode === MODES.RAM ? 1
     : mode === MODES.PROBE ? 0.35 : 0;
   v.eyeMat.opacity += (eyes - v.eyeMat.opacity) * Math.min(1, dt * 10);
+  // loaded models (beastModels.js) add their own motion: animation clips, ripple, lurch
+  if (v.after) v.after(v, m, state, dt, { speed: moved / Math.max(dt, 1e-3), fast });
 }

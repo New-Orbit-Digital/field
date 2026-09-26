@@ -54,6 +54,14 @@ src/render/            three.js — reads sim state, never writes it
   puffs.js             vapour: exhaust from both cars, your breath
   impacts.js           snow and blood bursts where bullets land
   flareRig.js · snow.js · followCamera.js · debugRings.js · textures.js
+  assets.js            loads the 3D models (src/render/models/) and re-colours them (GRIT: dark, desaturated, mottled)
+  soldier.js           the player as the Soldier model: animation clips, pistol in the right hand, torch in the left
+  beastModels.js       monster models per kind: spider = hunter, mantis = breaker, centipede = rammer
+  copCarModel.js       the cop car model flipped onto its roof and fitted to the sim's car; the smashed-glass model
+  scenery.js           dead trees out past the crowd; zombies shambling at the edge (visual only)
+  models/              the .glb files. Every rig starts procedural and swaps as its model loads; ?models=0 turns them off
+
+assets/source/         original source files that aren't loaded directly (Soldier.fbx → models/soldier.glb)
 
 src/audio/             procedural Web Audio (no asset files)
   index.js             sim event → sound mapping
@@ -74,6 +82,8 @@ tools/                 build, balance report, headless screenshots, phone demo c
 | `npm run sim` | Balance report: defence-only survival and objective win rates for scripted players of different skill |
 | `npm run build` | `dist/field.js`, single-file `dist/field.html`, and `dist/field.artifact.html` (for the claude.ai page) |
 | `npm run shots` | Headless Chromium screenshots of posed scenes → `shots/` |
-| `npm run pages-check` | Loads the no-build Pages version under `/field/` (CDN answered from `node_modules`) and fails on any error |
+| `npm run pages-check` | Loads the no-build Pages version under `/field/` (CDN answered from `node_modules`), and fails on any error or if any of the 9 models doesn't load |
+| `npm run model-shots` | Screenshots of each monster kind alone in the flashlight, the player, the wreck, and the zombies at the edge → `shots/models-*.png` |
+| `node tools/convert-soldier.mjs` | Rebuilds `models/soldier.glb` from `assets/source/Soldier.fbx` (merged meshes, only the clips the game uses) |
 
 Tunables live in `src/sim/config.js`.

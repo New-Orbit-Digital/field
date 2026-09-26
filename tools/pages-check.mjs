@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 let pw;
 try { pw = require('playwright'); } catch { pw = require(execSync('npm root -g').toString().trim() + '/playwright'); }
 
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml' };
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.glb': 'model/gltf-binary' };
 const root = resolve('.');
 const server = createServer(async (req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
@@ -37,14 +37,21 @@ await page.route('https://cdn.jsdelivr.net/npm/three@*/build/**', async (route) 
   cdn.push(file);
   route.fulfill({ path: resolve('node_modules/three/build', file), contentType: 'text/javascript' });
 });
+// three/addons/ (GLTFLoader, SkeletonUtils) through the import map
+await page.route('https://cdn.jsdelivr.net/npm/three@*/examples/jsm/**', async (route) => {
+  const file = route.request().url().split('/examples/jsm/')[1];
+  cdn.push('examples/jsm/' + file);
+  route.fulfill({ path: resolve('node_modules/three/examples/jsm', file), contentType: 'text/javascript' });
+});
 await page.goto(`http://localhost:${port}/field/?seed=PAGES`);
 await page.waitForFunction(() => window.__field, null, { timeout: 30000 });
 await page.screenshot({ path: 'shots/pages-title.png' });
 await page.evaluate(() => { window.__field.startHeadless('PAGES'); });
+const models = await page.evaluate(() => window.__field.modelsReady());
 await page.waitForTimeout(4000);
 const t = await page.evaluate(() => window.__field.game.t);
 await page.screenshot({ path: 'shots/pages-live.png' });
 await browser.close();
 server.close();
-console.log(JSON.stringify({ servedUnder: '/field/', cdnFiles: cdn, liveSimSeconds: +t.toFixed(2), errors }, null, 2));
-if (errors.length || t <= 0) process.exit(1);
+console.log(JSON.stringify({ servedUnder: '/field/', cdnFiles: cdn, modelsLoaded: models, liveSimSeconds: +t.toFixed(2), errors }, null, 2));
+if (errors.length || t <= 0 || models.length !== 9) process.exit(1);

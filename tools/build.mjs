@@ -32,7 +32,12 @@ if (serve) {
     const ext = f.split('.').pop();
     if (MIME[ext]) sfx[f] = `data:${MIME[ext]};base64,${readFileSync(`src/audio/sfx/${f}`).toString('base64')}`;
   }
-  const sfxScript = `<script>window.__FIELD_SFX=${JSON.stringify(sfx)};</script>\n`;
+  // …and so do the 3D models (src/render/models/)
+  const models = {};
+  for (const f of readdirSync('src/render/models')) {
+    if (f.endsWith('.glb')) models[f] = `data:model/gltf-binary;base64,${readFileSync(`src/render/models/${f}`).toString('base64')}`;
+  }
+  const sfxScript = `<script>window.__FIELD_SFX=${JSON.stringify(sfx)};window.__FIELD_MODELS=${JSON.stringify(models)};</script>\n`;
   const css = readFileSync('src/ui/styles.css', 'utf8');
   const html = readFileSync('index.html', 'utf8')
     .replace('<link rel="stylesheet" href="./src/ui/styles.css">', () => `<style>\n${css}</style>`)
