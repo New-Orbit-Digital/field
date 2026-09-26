@@ -5,6 +5,7 @@ import { emit } from './events.js';
 export function setFlashlight(state, want, dt) {
   const { player: P, cfg } = state;
   const fl = cfg.flashlight;
+  if (P.flashlightBroken) { P.flashlightOn = false; P.flashlightLocked = true; return; }
   if (P.flashlightLocked && P.battery >= fl.restartThreshold) P.flashlightLocked = false;
   const wasOn = P.flashlightOn;
   P.flashlightOn = want && !P.flashlightLocked && P.battery > 0;
