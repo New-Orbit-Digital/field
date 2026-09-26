@@ -102,7 +102,7 @@ export function createWorld(canvas, cfg) {
     truckExhaust.update(dt, truckPipe, truckDir);
     breathe(state, view, py, dt);
     puffs.update(dt, cam.camera);
-    const gust = hazardRig.update(state, dt, scene.fog);
+    const gust = hazardRig.update(state, dt);
     snow.update(dt, state.player.pos, gust);
     cam.update(state, view, py, dt);
     debugRings.visible = view.debug;
