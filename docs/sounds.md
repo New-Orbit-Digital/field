@@ -4,7 +4,7 @@ A running list. **Recorded** means Justin supplied the file (in `src/audio/sfx/`
 
 Every recorded sound falls back to its stock version if the file is missing. To replace a stock sound, drop a file in `src/audio/sfx/` and tell Claude which row it covers; Claude wires it up and moves the row to the recorded list.
 
-*Last updated: 2026-09-26 (packet 05, hazards branch).*
+*Last updated: 2026-09-26 (packet 05 second revision). Statue and crawler are removed; the zombie is added; the tentacle now drags the car. Swarm and cold are backlogged, so their cues don't play. Rammer sounds (in the core list) no longer play in a normal night since rammers are retired. The whiteout now plays in normal nights.*
 
 ## Recorded (17 files)
 | File | Plays on |
@@ -51,33 +51,33 @@ Every recorded sound falls back to its stock version if the file is missing. To 
 | mantle click | climbing onto the car |
 | radio fixed / called blips | radio milestones |
 
-## Stock: hazards (packet 05), all placeholders
+## Stock: hazards (packet 05, revised), all placeholders
 | Sound | Plays on |
 |---|---|
-| roar-hiss + crunch | fire starts / spreads |
-| short hiss | fire knocked down a stage / out |
-| thud + low clang + long hiss | car explodes |
+| soft hiss | fire starts (smoulder) |
+| roar-hiss + crunch | fire takes hold |
+| short hiss | fire put out |
+| thud + low clang + long hiss | car explodes (then glass + clang as the lights go) |
+| thud | knocked down by the blast |
 | metal click | extinguisher picked up |
-| high hiss | swarm arrives |
-| high crunch | swarm hit by a shot |
-| high hiss (short) | swarm scatters |
+| high hiss | swarm arrives (backlogged) |
+| high hiss (short) | swarm scattered by a shot (backlogged) |
 | scrape | tentacle appears |
-| thud + scrape | tentacle grabs you |
-| crunch | each struggle (A/D) |
+| clangs | tentacle bursting a light bar (then glass + clang) |
+| scrape + low clang | tentacle starts dragging the car |
 | low crunch | tentacle shot |
-| moan | tentacle severed / you broke free |
-| long low hiss | gust warning and whiteout |
-| scrape | statue starts moving |
-| scrape + crunch | crawler tell |
-| thud | crawler grab |
-| growl | crawler repelled |
-| metal click | bullet ricochets off the statue |
+| moan | tentacle severed |
+| long low hiss | whiteout warning and wind |
+| moan | zombie appears |
+| thud + growl | zombie grabs you |
+| crunch | each struggle (A/D) |
+| short growl | zombie bites |
+| crunch | zombie shoved off / shot |
 
 ## Missing entirely (no sound yet)
-- Fire crackle loop while it burns.
-- Swarm buzz loop.
-- Tentacle slither loop while it creeps.
-- Statue: grinding while it moves (only a one-off scrape at the start).
-- Cold: shivering / teeth chattering when low.
+- Fire crackle loop while it burns; a roll of engine sputter when it catches.
+- Tentacle slither loop while it creeps; metal-scraping loop while it drags the car.
+- Zombie: footsteps / groaning loop while it walks.
 - Extinguisher spray.
 - Snow-kicking while fighting the fire.
+- Whiteout: a proper howling wind loop (the placeholder is a long low hiss).
