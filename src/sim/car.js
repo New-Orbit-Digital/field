@@ -1,10 +1,17 @@
 // The overturned car as an oriented box: collision, standing on top, and the pickup spots.
+// Its pose (cfg.car.x, cfg.car.z, cfg.car.yaw) can change during a night: rammers shove it around.
 
 export function worldToCar(cfg, p) {
   const c = Math.cos(cfg.car.yaw), s = Math.sin(cfg.car.yaw);
-  return { x: p.x * c - p.z * s, z: p.x * s + p.z * c };
+  const x = p.x - (cfg.car.x || 0), z = p.z - (cfg.car.z || 0);
+  return { x: x * c - z * s, z: x * s + z * c };
 }
 export function carToWorld(cfg, l) {
+  const c = Math.cos(cfg.car.yaw), s = Math.sin(cfg.car.yaw);
+  return { x: l.x * c + l.z * s + (cfg.car.x || 0), z: -l.x * s + l.z * c + (cfg.car.z || 0) };
+}
+// direction (not a point) from car-local to world
+export function carDirToWorld(cfg, l) {
   const c = Math.cos(cfg.car.yaw), s = Math.sin(cfg.car.yaw);
   return { x: l.x * c + l.z * s, z: -l.x * s + l.z * c };
 }

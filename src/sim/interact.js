@@ -61,7 +61,8 @@ export function stepInteract(state, input, dt) {
     }
   }
   const wasInteracting = P.interacting;
-  P.interacting = !!(input.interact && P.activeSpot && spotUsable(state, P.activeSpot));
+  if (P.interactBlock && !input.interact) P.interactBlock = false; // let go of E: you can start again
+  P.interacting = !!(input.interact && !P.interactBlock && P.activeSpot && spotUsable(state, P.activeSpot));
   if (P.interacting) {
     if (!wasInteracting) emit(state, 'interact_start', { spot: P.activeSpot });
     doInteract(state, P.activeSpot, dt);

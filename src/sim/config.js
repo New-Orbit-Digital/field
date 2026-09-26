@@ -11,7 +11,10 @@ export const CONFIG = {
     embankmentHeight: 4,   // how far above the field the headlights sit, so the crowd rarely blocks them
   },
   car: {
-    yaw: 0.4,              // must match the rendered wreck's rotation
+    x: 0, z: 0,            // where it lies now (rammers shove it around during the night)
+    yaw: 0.4,              // …and which way it points
+    maxDrift: 1.6,         // it never ends up further than this from where the night started
+    maxTurn: 0.4,          // …or turned more than this (radians)
     halfLength: 2.35,      // local x half-extent
     halfWidth: 0.95,       // local z half-extent
     top: 1.62,             // height of the upturned chassis you can stand on
@@ -105,6 +108,12 @@ export const CONFIG = {
     breakOffMin: 2,        // delay before a replacement hunter breaks off
     breakOffMax: 6,
     goneDist: 55,          // a twice-shot monster runs this far out and is gone for good
+    // Three kinds, each with its own look and its own idea of what to do when it breaks off:
+    //   hunter  — comes for you (stalk, probe, warn, lunge)
+    //   breaker — goes for the flashing lights on one side of the car and smashes them (that side stays dark)
+    //   rammer  — charges the car and shoves it: jostles, turns or slides it, interrupting whatever you're doing
+    kinds: { hunter: 10, breaker: 4, rammer: 4 },
+    breakOffWeights: { hunter: 0.55, breaker: 0.2, rammer: 0.25 },
   },
   monster: {
     stalkMinDist: 7,
@@ -140,6 +149,21 @@ export const CONFIG = {
     // Several of them
     attackerCapBase: 1,    // concurrent warn/commit/climb allowed = base + floor((n-1)/perExtra)
     attackerPerExtra: 99,  // tuned: a 2nd simultaneous attacker made the wait phase unwinnable (see balance notes)
+    // Breakers and rammers
+    approachSpeed: 3.4,    // walking in to the car
+    smashTime: 1.6,        // telegraphed (banging, glass) — light it and it runs before the lights go
+    smashReach: 0.9,       // how close to the light bar it has to get
+    windupTime: 1.0,       // a rammer paws and snorts this long before it charges
+    ramStartDist: 4.5,     // …from about this far out
+    ramSpeed: 7,
+    ramCloseCharge: 1.5,   // lit when it's this close to the hull: too late, it hits anyway
+    rammersIgnoreFlares: true, // they're too big and too angry to care about a flare (the beam still works)
+    jostleChance: 0.5,     // a ram: jostle (tiny shove) …
+    rotateChance: 0.25,    // … or turn the car a few degrees; otherwise slide it
+    jostleTurn: 0.015, jostleSlide: 0.05,
+    rotateMin: 0.05, rotateMax: 0.1,
+    slideMin: 0.2, slideMax: 0.4,
+    roofFallChance: 0.5,   // standing on the roof when it hits: you might go over
     // Walking out into the dark: the crowd is right there
     deepDarkWarnTime: 0.5,
     deepDarkSpeedMult: 1.4,

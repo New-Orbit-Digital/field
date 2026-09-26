@@ -29,6 +29,7 @@ export function createGame(seed, overrides = {}) {
     flares: [],            // { pos, state: 'flying'|'burning', t, from }
     carFlares: cfg.flares.carSupply,
     flareReadyAt: 0,       // the flare box hands out the next one from this time
+    strobes: [true, true], // the red/blue flashers on each side of the car: [side +1, side -1]. Breakers smash them.
     player: {
       pos: { x: 0, z: 5 },
       y: 0, vy: 0, grounded: true, onCar: false, mantle: 0,
@@ -51,6 +52,7 @@ export function createGame(seed, overrides = {}) {
       activeSpot: null,    // spot you're standing at and facing (for prompts)
       hold: 0,             // pickup hold progress
       interacting: false,
+      interactBlock: false, // a ram knocked you off what you were doing: let go of E and press it again
     },
     monsters: [],
   };
@@ -96,7 +98,7 @@ export function runHeadless(seed, policy, { maxTime = 600, overrides } = {}) {
 
 // ---------- public API (used by the renderer, UI, bots and tests) ----------
 export { forward, bearingTo, wrapAngle } from './math.js';
-export { worldToCar, carToWorld, carDistance, spotWorld } from './car.js';
+export { worldToCar, carToWorld, carDirToWorld, carDistance, spotWorld } from './car.js';
 export { aimYaw, inViewGeometry, inBeam, inFlare, flareRadius, inDimArea, isLit, monsterVisible, inDeepDark } from './perception.js';
 export { MODES, HUNTING } from './modes.js';
 export { attackerCap, hunterCount } from './horde.js';
