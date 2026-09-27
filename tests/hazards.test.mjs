@@ -13,6 +13,8 @@ function quiet(seed = 'HZ', { keepFlare = false } = {}) {
   if (!keepFlare) s.flares = [];
   s.hordeTarget = 0; s.breakOffTimer = 1e9; s.cfg.horde.repairRampCap = 0;
   s.cfg.hazards.gust.random = false; s.cfg.hazards.tentacles.random = false; // one hazard at a time
+  s.cfg.hazards.fire.random = false; s.cfg.hazards.zombie.random = false;
+  s.cfg.difficulty.hunterPerStep = 0; // and nobody hunting
   s.monsters.forEach((m, i) => { m.mode = MODES.SHAMBLE; m.pos = { x: Math.sin(i) * 27, z: Math.cos(i) * 27 }; m.wander = { ...m.pos }; m.wanderT = 1e9; });
   return s;
 }
@@ -269,18 +271,23 @@ test('zombie: two hits knock it down; it may get up (1 in 6 every 5 s); two more
 });
 
 // ---------- general ----------
-test('hazards: a normal night has early, frequent whiteouts and a tentacle ~30 s in; no rammers', () => {
+test('hazards: a normal night has early, frequent whiteouts, a tentacle ~30 s in, fire armed and a zombie at 45 s; no rammers', () => {
   const s = createGame('NORM');
   ticks(s, secs(s, 29.5), (g) => ({ yaw: g.player.yaw, ...idle }));
   assert.equal(s.hazards.tentacles.length, 0, 'no tentacle before 30 s');
   assert.ok(s.events.some((e) => e.type === 'gust_warn' && e.t <= s.cfg.hazards.gust.firstMax + 1e-6), 'a whiteout early on');
   ticks(s, secs(s, 1));
   assert.equal(s.hazards.tentacles.length, 1, 'the tentacle comes at 30 s');
-  assert.ok(!s.hazards.fire && !s.hazards.fireArmed && !s.hazards.swarm && !s.hazards.cold && !s.hazards.zombie);
+  assert.ok(s.hazards.fireArmed || s.hazards.fire || s.hazards.carBlown, 'fire is armed in a normal night (packet 08)');
+  assert.ok(!s.hazards.zombie, 'no zombie before 45 s');
+  assert.ok(!s.hazards.swarm && !s.hazards.cold, 'swarm and cold stay backlogged');
   assert.equal(s.monsters.filter((m) => m.kind === 'rammer').length, 0);
+  const z = createGame('NORMZ'); z.player.pos = { x: 6, z: 6 };
+  ticks(z, secs(z, 45.5), (g) => ({ yaw: g.player.yaw, ...idle, flashlight: true }));
+  assert.ok(!z.alive || z.hazards.zombie || z.hazards.zombieRespawn != null, 'the zombie walks in at 45 s');
 
   // a long night: whiteouts keep coming, 25–50 s apart
-  const g = createGame('NORM2'); g.cfg.hazards.tentacles.random = false; g.hordeTarget = 0; g.breakOffTimer = 1e9; g.cfg.horde.repairRampCap = 0;
+  const g = createGame('NORM2'); g.cfg.hazards.tentacles.random = false; g.cfg.hazards.fire.random = false; g.cfg.hazards.zombie.random = false; g.hordeTarget = 0; g.breakOffTimer = 1e9; g.cfg.horde.repairRampCap = 0;
   ticks(g, secs(g, 200));
   const gusts = g.events.filter((e) => e.type === 'gust_warn');
   assert.ok(gusts.length >= 4, `only ${gusts.length} whiteouts in 200 s`);
@@ -352,4 +359,57 @@ test('unlimited ammo: reload whenever the magazine is not full; no reserve runs 
   assert.equal(s.player.reserve, Infinity);
   s.player.mag = 5; ticks(s, 1, { ...idle, reload: true });
   assert.ok(s.player.reloading > 0, 'can reload with 5 in the gun');
+});
+
+test('difficulty: another hunter every 30 s, shorter pauses, a second attacker from 90 s, bolder while you work', async () => {
+  const { attackerCap } = await import('../src/sim/game.js');
+  const { lullScale } = await import('../src/sim/monster.js');
+  const s = createGame('DIFF'); s.cfg.hazards.gust.random = false; s.cfg.hazards.tentacles.random = false;
+  s.player.pos = { x: 100, z: 100 }; // (not played: we only read the ramp)
+  const at = (t) => { s.t = t; s.hordeTarget = 1; step(s, { yaw: 0 }); return { target: s.hordeTarget, lull: lullScale(s), cap: attackerCap(s) }; };
+  s.alive = true;
+  const a = at(5), b = at(85), c = at(95);
+  assert.ok(b.target > a.target && b.target >= 3, `hunters ${a.target} -> ${b.target}`);
+  assert.equal(b.cap, 1);
+  assert.ok(b.lull < a.lull && b.lull >= s.cfg.difficulty.lullFloor);
+  assert.equal(a.cap, 1); assert.equal(c.cap, 2);
+  s.player.interacting = true;
+  assert.ok(Math.abs(lullScale(s) - c.lull * s.cfg.difficulty.workingLullMult) < 1e-9, 'bolder while you work at the car');
+});
+
+test('whiteout: the wind shoves you along with it, faster at the peak', () => {
+  const s = quiet('PUSH'); s.player.pos = { x: 6, z: -6 };
+  spawnHazard(s, 'gust'); s.hazards.gust.dir = 0; // blowing toward +z
+  const z0 = s.player.pos.z;
+  ticks(s, secs(s, 1.2 + 9));
+  const moved = s.player.pos.z - z0;
+  // ramp 3 s up, 3 s hold, 3 s down at 1.1 m/s peak -> about 6.6 m
+  assert.ok(moved > 5 && moved < 8, `pushed ${moved.toFixed(2)} m`);
+  assert.ok(Math.abs(s.player.pos.x - 6) < 1e-6, 'only along the wind');
+});
+
+test('once help is on the way: roof campers make fire 70% likelier, and the monsters get bolder', async () => {
+  const { lullScale } = await import('../src/sim/monster.js');
+  const count = (roof) => {
+    let caught = 0; const N = 400;
+    for (let i = 0; i < N; i++) {
+      const g = quiet('RF' + (roof ? 'r' : 'g') + i); g.cfg.hazards.fire.explodeK = 0; g.radio.phase = 'wait'; g.radio.rescueLeft = 999;
+      if (roof) { g.player.pos = { x: 0, z: 0 }; g.player.y = g.cfg.car.top; g.player.onCar = true; g.player.grounded = true; } else g.player.pos = { x: 8, z: 8 };
+      startHazardTest(g, 'fire');
+      ticks(g, secs(g, 10.05)); if (g.hazards.fire) caught++;
+    }
+    return caught / N;
+  };
+  const ground = count(false), roof = count(true);
+  assert.ok(roof > ground * 1.35 && roof < ground * 2.2, `ground ${ground} vs roof ${roof} (expect ~1.7x)`);
+  const w = quiet('WAITBOLD'); const before = lullScale(w); w.radio.phase = 'wait';
+  assert.ok(Math.abs(lullScale(w) - before * w.cfg.difficulty.waitLullMult) < 1e-9);
+});
+
+test('whiteout: on the roof the wind blows you along too, and can blow you off the edge', () => {
+  const s = quiet('ROOFWIND'); s.player.pos = { x: 0, z: 0 }; s.player.y = s.cfg.car.top; s.player.onCar = true; s.player.grounded = true;
+  spawnHazard(s, 'gust'); s.hazards.gust.dir = 0;
+  ticks(s, secs(s, 1.2 + 9));
+  assert.equal(s.player.onCar, false, 'blown off the roof');
+  assert.ok(types(s).includes('fall'));
 });
