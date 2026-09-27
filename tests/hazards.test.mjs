@@ -413,3 +413,15 @@ test('whiteout: on the roof the wind blows you along too, and can blow you off t
   assert.equal(s.player.onCar, false, 'blown off the roof');
   assert.ok(types(s).includes('fall'));
 });
+
+test('fire: the trunk has an extinguisher whenever yours is empty (unlimited, packet 09)', () => {
+  const s = quiet('EXT'); s.cfg.hazards.fire.explodeK = 0; s.cfg.hazards.fire.random = true;
+  spawnHazard(s, 'fire');
+  faceSpot(s, 'ammo'); ticks(s, secs(s, 1.4), { ...idle, interact: true });
+  assert.ok(s.player.extinguisher > 0);
+  s.player.extinguisher = 0; // used it all up
+  ticks(s, 1); // let go of E
+  faceSpot(s, 'ammo'); ticks(s, secs(s, 1.4), { ...idle, interact: true });
+  assert.equal(s.player.extinguisher, s.cfg.hazards.fire.extinguisherCharge, 'a fresh one');
+  assert.equal(s.events.filter((e) => e.type === 'extinguisher_pickup').length, 2);
+});
