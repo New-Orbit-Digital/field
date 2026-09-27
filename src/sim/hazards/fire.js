@@ -2,7 +2,7 @@
 // 10 s, 1 in 6). It smoulders briefly, then burns. It doesn't spread. The longer it burns, the likelier the car
 // goes up. If it does: the car's lights are gone for good, and if you're close you're knocked down, take a
 // hit, and your flashlight is dead. Hold E at the engine to put it out (extinguisher from the trunk: fast;
-// kicking snow: slow). While it burns it's light, so the monsters keep out of it.
+// kicking snow: slow). While it burns it's light (it only keeps monsters out when flares.repels is on).
 import { emit } from '../events.js';
 import { carDistance, carToWorld } from '../car.js';
 import { dist } from '../math.js';

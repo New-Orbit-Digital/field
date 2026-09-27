@@ -92,6 +92,11 @@ export const CONFIG = {
     startDistance: 5,      // …this far from the wreck, on the side away from the headlights
     radius: 9,             // lights (and keeps them out of) a circle this big
     gutterTime: 3,         // over its last few seconds the light dies down — and so does the circle it protects
+    // Packet 08 (Justin): a flare is working light, not protection. Monsters no longer keep out of its circle or
+    // hold off attacking you inside it; the flashlight is what drives them off. It still startles whatever is close
+    // when it lands (landScare).
+    repels: false,
+    landScare: true,
   },
   radio: {
     repairTime: 40,        // cumulative seconds of holding E at the radio
@@ -176,11 +181,13 @@ export const CONFIG = {
     deepDarkPack: 3,       // how many of the crowd come for you at once
     deepDarkRange: 16,     // …from this close
   },
-  // Hazards (packet 05, revised in packet 07). Whiteouts and the tentacle are part of a normal night (random);
-  // fire and zombie are tested in the sandbox (?hazard) until they're scheduled. Swarm and cold are backlogged.
+  // Hazards. Since packet 08 all four active ones are part of a normal night (random: true): whiteouts, the
+  // tentacle, fire and the zombie. The sandbox (?hazard) still tests them one at a time. Swarm and cold are backlogged.
   hazards: {
     fire: {
+      random: true,            // part of a normal night (packet 08): armed from the start, re-armed after it's put out
       igniteEvery: 10, igniteChance: 1 / 6, // once the first flare's out: every 10 s, a 1-in-6 chance it catches (Justin's call)
+      roofIgniteMult: 1.7,     // once help is on the way, standing on the roof makes it 70% likelier (Justin, packet 08)
       smolderTime: 2,          // after it catches: a couple of seconds of smoke before it really goes
       explodeK: 1 / 450,       // chance per second the car goes up = burn time × this (≈22% by 15 s, 63% by 30 s)
       blastRange: 4,           // near the car when it goes: knocked down, a hit, your flashlight dead
@@ -233,9 +240,12 @@ export const CONFIG = {
       random: true,            // part of a normal night: they blow in at random (Justin's call)
       firstMin: 3, firstMax: 25, // no long wait: the first one comes early…
       gapMin: 25, gapMax: 50,   // …and they keep coming (a run lasts ~2–3 min)
+      push: 1.1,               // the wind shoves you along with it (m/s at peak; you walk at 3.2)
       // the renderer piles on snow and drives it hard in one direction (no fog change)
     },
     zombie: {
+      random: true,            // part of a normal night (packet 08): the first one comes in at firstAt…
+      firstAt: 45,             // …and after one dies, another comes 20 s later (respawnAfter)
       speed: 0.65,             // slow (halved, Justin), but light doesn't stop it
       spawnDist: 20,
       grabRange: 0.8,
@@ -250,6 +260,18 @@ export const CONFIG = {
       respawnAfter: 20,        // then another comes in from the edge
       bodyRadius: 0.45,
     },
+  },
+  // Packet 08 (Justin): the night gets harder the longer it goes, and they get bolder while you're busy at the car.
+  difficulty: {
+    stepEvery: 30,           // every 30 s…
+    hunterPerStep: 1,        // …one more hunter out of the crowd (up to horde.max)…
+    lullShrink: 0.15,        // …and the pauses between their moves 15% shorter…
+    lullFloor: 0.4,          // …down to 40% of normal
+    secondAttackerAt: 90,    // from 90 s in, two can come at you at once
+    workingLullMult: 0.5,    // working at the car (holding E): pauses halved…
+    workingProbeMult: 0.4,   // …and far fewer feints: they commit
+    waitLullMult: 0.6,       // once help is on the way they get bolder still: shorter pauses…
+    waitProbeMult: 0.5,      // …and fewer feints
   },
   sim: {
     dt: 1 / 60,
