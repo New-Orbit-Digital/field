@@ -8,7 +8,6 @@ export function showOverlay(which) {
 
 export function setupTitle({ seed, best, demo }) {
   if (demo) { $('cta').textContent = 'Tap to watch the demo'; $('demoNote').hidden = false; }
-  $('titleSeed').textContent = seed;
   $('bestTitle').textContent = best ? `Fastest rescue: ${fmt(best)}` : '';
 }
 
@@ -17,7 +16,6 @@ export function showGameOver(game, seed, best) {
   $('overTitle').textContent = game.won ? 'RESCUED' : 'You lasted';
   $('overTime').textContent = fmt(t);
   $('overBest').textContent = best ? fmt(best) : '—';
-  $('overSeed').textContent = seed;
   const repels = game.events.filter((e) => e.type === 'repel' || e.type === 'shot_hit').length;
   $('overRepels').textContent = String(repels);
   const ph = game.radio.phase;
