@@ -38,6 +38,29 @@ export function createAudio() {
     windLoop?.setPos(P.pos.x, P.pos.z, 3);
     whiteLoop?.setPos(P.pos.x, P.pos.z, 3);
   }
+  // First-load intro (packet 09): the car door, then footsteps across the snow, the wind fading in underneath.
+  let introSteps = null;
+  const intro = {
+    async start() {
+      engine.setListener({ x: 0, z: 5 }, 0);
+      if (!windLoop) { windLoop = sfx.loop('wind-ambience', { pos: { x: 0, y: 3, z: 5 }, gain: 0, ref: 50, rolloff: 0.01 }); muteWind(); }
+      windLoop.setGain(0.9, 2.5); // fades in over the whole sequence
+      await sfx.ready('car-door', 1500);
+      sfx.play('car-door', { gain: 1.2 });
+      setTimeout(() => {
+        introSteps = sfx.loop('monster-footsteps', { pos: { x: 0.4, y: 0.2, z: 5.4 }, gain: 0, ref: 3, rolloff: 1, randomStart: false });
+        introSteps.setGain(1.3, 0.6);
+      }, 2600);
+    },
+    end() {
+      if (introSteps) { const l = introSteps; introSteps = null; l.setGain(0, 0.25); setTimeout(() => l.stop(), 1500); }
+      // striking the first flare
+      crunch(null, null, { gain: 0.35, pitch: 1.7 });
+      hiss(null, 1.6, 0.45, 3800);
+      hiss(null, 3, 0.2, 2200);
+    },
+  };
+
   // Whiteout: its own recorded loop on top of the wind, faded in for the blow and out after.
   function whiteoutStart(P) {
     if (!sfx.has('whiteout')) { hiss(P.pos.x, P.pos.z, 8, 0.5, 500); return; }
@@ -306,6 +329,7 @@ export function createAudio() {
       whiteLoop?.stop(); whiteLoop = null;
     },
     hazardOn,
+    intro,
     // the run's over: the monsters stop moving, so their footstep loops shouldn't keep going (they did)
     onGameOver() { for (const s of stepLoops.values()) s.loop.setGain(0, 0.3); whiteoutEnd(); },
   };
