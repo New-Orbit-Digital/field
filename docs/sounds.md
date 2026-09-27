@@ -4,9 +4,9 @@ A running list. **Recorded** means Justin supplied the file (in `src/audio/sfx/`
 
 Every recorded sound falls back to its stock version if the file is missing. To replace a stock sound, drop a file in `src/audio/sfx/` and tell Claude which row it covers; Claude wires it up and moves the row to the recorded list.
 
-*Last updated: 2026-09-26 (packet 05 second revision). Statue and crawler are removed; the zombie is added; the tentacle now drags the car. Swarm and cold are backlogged, so their cues don't play. Rammer sounds (in the core list) no longer play in a normal night since rammers are retired. The whiteout now plays in normal nights.*
+*Last updated: 2026-09-26 (packet 07: wind, whiteout and glass recorded; engine loop +40%; zombie down/up/dead and tentacle stomp cues added). Before that, packet 05 second revision: Statue and crawler are removed; the zombie is added; the tentacle now drags the car. Swarm and cold are backlogged, so their cues don't play. Rammer sounds (in the core list) no longer play in a normal night since rammers are retired. The whiteout now plays in normal nights.*
 
-## Recorded (17 files)
+## Recorded (20 files)
 | File | Plays on |
 |---|---|
 | `engine-loop.wav` | cop car idling, looped at the tailpipe |
@@ -22,11 +22,14 @@ Every recorded sound falls back to its stock version if the file is missing. To 
 | `reloading.mp3` | reload in progress |
 | `reload-success.mp3` | reload done and perfect reload (pitched up) |
 | `failed-reload.mp3` | reload jam |
+| `wind-ambience.mp3` | wind, looping all night (replaces the stock wind bed) — packet 07 |
+| `whiteout.mp3` | the whiteout's own loop, faded in/out with each blow — packet 07 |
+| `glass-breaking.mp3` | a light bar smashed (tentacle, breaker or the explosion) — packet 07 |
 
 ## Stock: core game
 | Sound | Plays on |
 |---|---|
-| wind bed | always (ambience) |
+| wind bed | fallback only (until `wind-ambience.mp3` loads) |
 | car electrical hum + radio chatter | always, near the car (ambience) |
 | radio static bursts | working the radio, radio fixed, radio called |
 | rescue siren | after the call, closing in |
@@ -38,12 +41,12 @@ Every recorded sound falls back to its stock version if the file is missing. To 
 | climb scrape | a monster climbing the car |
 | moan | a twice-shot monster leaving for good |
 | clang (hammering) | breaker hammering the light bar |
-| glass + clang | lights smashed |
+| glass + clang | fallback for lights smashed |
 | charge crunches | rammer charging |
 | clang + crunches | ram impact |
 | dry-fire click | empty trigger pull |
 | perfect-reload blip | layered on top of `reload-success` |
-| ammo pickup clicks | grabbing ammo from the trunk |
+| ammo pickup clicks | grabbing ammo from the trunk (no longer plays: ammo is unlimited since packet 07) |
 | flare pickup blip | taking a flare |
 | flare drop crunch | dropping a flare |
 | flare hiss | a flare burning, for its full burn |
@@ -63,16 +66,20 @@ Every recorded sound falls back to its stock version if the file is missing. To 
 | high hiss | swarm arrives (backlogged) |
 | high hiss (short) | swarm scattered by a shot (backlogged) |
 | scrape | tentacle appears |
-| clangs | tentacle bursting a light bar (then glass + clang) |
+| scrape | tentacle working at a light bar (then `glass-breaking.mp3`) |
 | scrape + low clang | tentacle starts dragging the car |
 | low crunch | tentacle shot |
 | moan | tentacle severed |
-| long low hiss | whiteout warning and wind |
+| thud + crunch + moan | tentacle stomped |
+| short low hiss | whiteout warning (the blow itself is `whiteout.mp3`) |
 | moan | zombie appears |
 | thud + growl | zombie grabs you |
 | crunch | each struggle (A/D) |
 | short growl | zombie bites |
 | crunch | zombie shoved off / shot |
+| thud + crunch | zombie knocked down |
+| moan | zombie gets back up |
+| short growl | zombie dies |
 
 ## Missing entirely (no sound yet)
 - Fire crackle loop while it burns; a roll of engine sputter when it catches.
@@ -80,4 +87,3 @@ Every recorded sound falls back to its stock version if the file is missing. To 
 - Zombie: footsteps / groaning loop while it walks.
 - Extinguisher spray.
 - Snow-kicking while fighting the fire.
-- Whiteout: a proper howling wind loop (the placeholder is a long low hiss).
