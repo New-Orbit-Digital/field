@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import { runHeadless, createGame, step, bearingTo, spotWorld, attackerCap, hunterCount, MODES, carDistance, reloadProgress, aimYaw, inBeam, inFlare, flareRadius, HUNTING, carToWorld, worldToCar } from '../src/sim/game.js';
 import { beginApproach, approachGoal } from '../src/sim/monster.js';
 import { idleBot, reactiveBot, objectiveBot } from '../src/sim/bots.js';
+import { CONFIG } from '../src/sim/config.js';
+
+// These tests are about the monsters and the core loop; the bots don't know about the night's random hazards
+// (whiteouts, the car-dragging tentacle) yet, so switch those off for this file (tests run one file per process).
+CONFIG.hazards.gust.random = false;
+CONFIG.hazards.tentacles.random = false;
 
 const SEEDS = Array.from({ length: 40 }, (_, i) => `T${i}`);
 const ticks = (s, n, input) => { for (let i = 0; i < n; i++) step(s, typeof input === 'function' ? input(s, i) : input); };
@@ -173,7 +179,7 @@ test('bullets scare: everything near where a shot lands runs from that spot', ()
   s.player.pos = { x: 0, z: 5 }; s.player.yaw = 0;
   const [a, b] = s.monsters;
   const landing = { x: 0, z: 5 + s.cfg.monster.impactDist };
-  a.mode = MODES.SHAMBLE; a.pos = { x: 2, z: landing.z + 1 }; a.wanderT = 1e9; a.wander = { ...a.pos };
+  a.mode = MODES.SHAMBLE; a.pos = { x: 3, z: landing.z + 1 }; a.wanderT = 1e9; a.wander = { ...a.pos }; // just outside the aim cone (aim assist, packet 07)
   b.mode = MODES.STALK; b.pos = { x: -2.5, z: landing.z - 1 }; b.timer = 99;
   ticks(s, 1, { yaw: 0, fire: true }); // a miss: lands in the snow
   assert.ok(s.events.some((e) => e.type === 'bullet_impact'));
@@ -201,10 +207,11 @@ test('pickups need you at the spot AND facing the car', () => {
   assert.ok(s.radio.repair > 1.9, `no repair progress facing the radio: ${s.radio.repair}`);
   assert.equal(s.player.flashlightOn, false, 'flashlight should be off while working on the car');
 
-  s.player.reserve = 0;
+  // ammo is unlimited now (packet 07): the trunk isn't an ammo spot any more
   standAt(s, 'ammo', true);
   ticks(s, Math.ceil(s.cfg.pistol.pickupTime * 60) + 2, { yaw: s.player.yaw, interact: true });
-  assert.equal(s.player.reserve, s.cfg.pistol.pickupAmount);
+  assert.equal(s.player.activeSpot, null);
+  assert.equal(s.player.reserve, Infinity);
 
   standAt(s, 'flares', true);
   ticks(s, 200, { yaw: s.player.yaw, interact: true });
