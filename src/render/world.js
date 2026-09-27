@@ -56,12 +56,31 @@ export function createWorld(canvas, cfg) {
   // Nothing is drawn until the models have settled (loaded or failed), so the title screen never flashes the
   // procedural stand-ins before the real models swap in. Then every material is compiled up front (warmUp), so
   // the first click doesn't stall on shader compiles (packet 08).
+  // Packet 09: the warm-up also uploads every texture and draws the scene once in each direction from where the
+  // night starts, so sweeping the camera early doesn't stall on first-time GPU uploads. world.ready resolves after.
   let modelsSettled = false;
-  modelsReady.then(() => { modelsSettled = true; warmUp(); });
+  const ready = modelsReady.then(() => { modelsSettled = true; warmUp(); });
   function warmUp() {
     const hidden = [];
     scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
-    try { renderer.compile(scene, cam.camera); if (psx) psx.render(scene, cam.camera); } catch (e) { console.error(e); }
+    try {
+      renderer.compile(scene, cam.camera);
+      const seen = new Set();
+      scene.traverse((o) => {
+        for (const m of [].concat(o.material || [])) for (const k in m) {
+          const t = m[k];
+          if (t && t.isTexture && !seen.has(t)) { seen.add(t); renderer.initTexture(t); }
+        }
+      });
+      const probe = cam.camera.clone();
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        probe.position.set(Math.sin(a) * 3, 2.4, 5 + Math.cos(a) * 3);
+        probe.lookAt(Math.sin(a) * 20, 0.8, 5 + Math.cos(a) * 20);
+        probe.updateMatrixWorld();
+        if (psx) psx.render(scene, probe); else renderer.render(scene, probe);
+      }
+    } catch (e) { console.error(e); }
     for (const o of hidden) o.visible = false;
   }
 
@@ -169,5 +188,5 @@ export function createWorld(canvas, cfg) {
   resize();
   function reset() { beasts.reset(); marks.reset(); tracks.reset(); hazardRig.reset(); scenery.reset(); }
 
-  return { renderer, psx: psxOn, scene, camera: cam.camera, update, resize, onEvent, reset, aimScreen, headScreen, feetScreen, worldScreen, spotScreen, modelsReady, loadedModels, playerRig, scenery };
+  return { renderer, psx: psxOn, scene, camera: cam.camera, update, resize, onEvent, reset, aimScreen, headScreen, feetScreen, worldScreen, spotScreen, modelsReady, ready, loadedModels, playerRig, scenery };
 }
