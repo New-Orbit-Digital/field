@@ -35,8 +35,19 @@ export function hitPlayer(state, M) {
   P.mantle = 0;
   const away = bearingTo(M.pos, P.pos);
   const f = forward(away);
-  P.pos.x += f.x * cfg.player.knockback;
-  P.pos.z += f.z * cfg.player.knockback;
+  if (P.onCar) {
+    P.pos.x += f.x * cfg.player.knockback;
+    P.pos.z += f.z * cfg.player.knockback;
+  } else {
+    // shoved along the ground in small steps, stopping at the hull (a single 1.6 m jump used to put you inside or
+    // clean through the car — Justin: "I clip right through the car")
+    const n = Math.ceil(cfg.player.knockback / 0.1);
+    for (let i = 0; i < n; i++) {
+      const nx = P.pos.x + f.x * cfg.player.knockback / n, nz = P.pos.z + f.z * cfg.player.knockback / n;
+      if (carDistance(cfg, { x: nx, z: nz }) < cfg.player.radius) break;
+      P.pos.x = nx; P.pos.z = nz;
+    }
+  }
   if (P.onCar) {
     // knocked clean off the wreck, away from the attacker
     P.onCar = false; P.grounded = false; P.vy = 2;
