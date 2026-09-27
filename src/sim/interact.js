@@ -9,7 +9,7 @@ export function spotUsable(state, name) {
   if (name === 'fire') return !!state.hazards?.fire;
   if (name === 'ammo' && state.hazards?.fire && !P.hasExtinguisher) return true; // the extinguisher's in there
   if (name === 'radio') return radio.phase === 'repair' || radio.phase === 'call';
-  if (name === 'ammo') return P.reserve < cfg.pistol.maxReserve;
+  if (name === 'ammo') return false; // ammo is unlimited now; the trunk only matters for the extinguisher
   if (name === 'flares') return P.flares < cfg.flares.carryMax && state.carFlares > 0 && state.t >= state.flareReadyAt;
   return false;
 }
@@ -63,7 +63,7 @@ export function stepInteract(state, input, dt) {
   const { player: P, cfg } = state;
   P.activeSpot = null;
   if (P.grounded && !P.onCar && P.reloading <= 0 && !P.held) {
-    for (const name of state.hazards?.fire ? ['fire', 'radio', 'ammo', 'flares'] : ['radio', 'ammo', 'flares']) {
+    for (const name of state.hazards?.fire ? ['fire', 'radio', 'ammo', 'flares'] : ['radio', 'flares']) {
       const s = spotWorld(cfg, name);
       if (dist(P.pos, s.stand) > cfg.spots.standRange) continue;
       if (Math.abs(wrapAngle(bearingTo(P.pos, s.face) - P.yaw)) > cfg.spots.faceHalfAngle) continue;

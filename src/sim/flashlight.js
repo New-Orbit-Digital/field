@@ -7,9 +7,9 @@ export function setFlashlight(state, want, dt) {
   const fl = cfg.flashlight;
   if (P.flashlightBroken) { P.flashlightOn = false; P.flashlightLocked = true; return; }
   if (P.flashlightLocked && P.battery >= fl.restartThreshold) P.flashlightLocked = false;
-  const wasOn = P.flashlightOn;
   P.flashlightOn = want && !P.flashlightLocked && P.battery > 0;
-  if (P.flashlightOn !== wasOn) emit(state, P.flashlightOn ? 'flash_on' : 'flash_off');
+  // click on what the player did, not on the whiteout's flicker (which switches flashlightOn behind our back)
+  if (P.flashlightOn !== !!P.lightClick) { P.lightClick = P.flashlightOn; emit(state, P.flashlightOn ? 'flash_on' : 'flash_off'); }
   if (P.flashlightOn) {
     P.battery -= fl.drainPerSec * dt;
     if (P.battery <= 0) {

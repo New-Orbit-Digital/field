@@ -31,6 +31,8 @@ export function createInput(canvas, { isPlaying, onLook, onDebug, onKey }) {
   });
 
   return {
+    // Right mouse held (flashlight / aiming), for the HUD.
+    aiming() { return flashlightHeld; },
     // Movement axes (for the "moving" animation) without consuming edges.
     axes() {
       const moveZ = (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0);

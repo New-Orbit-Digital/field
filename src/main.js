@@ -1,7 +1,7 @@
 // FIELD — bootstrap and the fixed-step game loop. Everything else lives in:
 //   src/sim     game rules (no rendering)      src/render  three.js scene
 //   src/audio   procedural sound               src/ui      input, HUD, overlays, debug
-import { createGame, step, MODES, wrapAngle, spotWorld, HAZARD_KINDS, spawnHazard, startHazardTest } from './sim/game.js';
+import { createGame, step, MODES, wrapAngle, spotWorld, HAZARD_KINDS, spawnHazard, startHazardTest, isolateHazard } from './sim/game.js';
 import { randomSeed } from './sim/rng.js';
 import { objectiveBot } from './sim/bots.js';
 import { createWorld } from './render/world.js';
@@ -19,12 +19,12 @@ let seed = params.get('seed') || randomSeed();
 // Hazard sandbox (packet 05): test one hazard at a time. ?hazard (or a test build with FIELD_SANDBOX set)
 // shows a picker on the title screen; ?hazard=fire starts straight into that one. In play, keys 1–4
 // spawn fire · tentacle · whiteout · zombie again (fire from the key catches straight away). Testing one
-// hazard switches off the night's random whiteouts, unless the whiteout is the one being tested.
+// hazard switches off the night's random ones (whiteouts, tentacles), unless it's the one being tested.
 const sandbox = params.has('hazard') || !!window.FIELD_SANDBOX;
 const sandboxList = (params.get('hazard') || '').split(',').map((k) => k.trim()).filter(Boolean);
 let startHazards = sandboxList.includes('all') ? HAZARD_KINDS : sandboxList.filter((k) => HAZARD_KINDS.includes(k) || k === 'tentacles');
 function seedHazards(g) {
-  if (startHazards.length && !startHazards.includes('gust')) g.cfg.hazards.gust.random = false;
+  if (startHazards.length === 1) isolateHazard(g, startHazards[0]); // one at a time: the night's random ones stay out
   for (const k of startHazards) startHazardTest(g, k);
 }
 let game = createGame(seed);
@@ -90,7 +90,6 @@ function start(newSeed) {
   audio.resume();
   bot = demo ? objectiveBot({ reaction: 0.45, missChance: 0.15, seed: Math.floor(Math.random() * 1e6) }) : null;
   botCursor = 0;
-  $('demoTag').hidden = !demo && !sandbox;
   phase = 'playing';
   showOverlay(null);
   lock();
@@ -103,6 +102,7 @@ function resume() { phase = 'playing'; audio?.resume(); showOverlay(null); lock(
 
 function over() {
   phase = 'over';
+  audio?.onGameOver();
   document.exitPointerLock?.();
   if (game.won && (!best || game.t < best)) { best = game.t; safeSet('field.best', String(best)); }
   showGameOver(game, seed, best);
@@ -146,7 +146,8 @@ function frame(now) {
 
   view.hazardOn = audio?.hazardOn() ?? null;
   world.update(game, view, dtReal);
-  hud.update(game, phase, world);
+  view.aiming = bot ? game.player.flashlightOn : input.aiming();
+  hud.update(game, phase, world, view);
   if (view.debug) renderDebug(game, seed);
   requestAnimationFrame(frame);
 }
@@ -169,4 +170,3 @@ window.__field = {
   MODES,
   spawnHazard: (k) => spawnHazard(game, k),
 };
-if (sandbox) $('demoTag').textContent = 'HAZARD SANDBOX · keys 1 fire · 2 tentacle · 3 whiteout · 4 zombie';

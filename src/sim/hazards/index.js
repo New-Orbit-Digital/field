@@ -1,9 +1,9 @@
-// Hazards (packet 05, second revision). Active: fire, tentacle, whiteout, zombie. Backlogged (code kept,
-// out of the sandbox): swarm, cold. Whiteouts are part of a normal night (random); the rest are tested one
-// at a time in the sandbox (?hazard) until they're scheduled.
+// Hazards (packet 05, revised in packet 07). Active: fire, tentacle, whiteout, zombie. Backlogged (code kept,
+// out of the sandbox): swarm, cold. Whiteouts and the tentacle are part of a normal night (random); fire and
+// the zombie are tested one at a time in the sandbox (?hazard) until they're scheduled.
 import { armFire, spawnFire, stepFire, stepKnockdown } from './fire.js';
 import { scatterSwarm, spawnSwarm, stepSwarm } from './swarm.js';
-import { spawnTentacle, stepTentacles, tentacleTargets } from './tentacles.js';
+import { spawnTentacle, stepTentacles, stepTentacleSchedule, tentacleTargets } from './tentacles.js';
 import { startCold, stepCold } from './cold.js';
 import { spawnGust, stepGust, stepGustSchedule } from './gust.js';
 import { spawnZombie, stepZombie, zombieTargets } from './zombie.js';
@@ -23,6 +23,12 @@ export function spawnHazard(state, kind) {
 }
 
 // The sandbox's way to start one hazard: like spawnHazard, except fire waits for the first flare to go out.
+// Testing one hazard switches the night's random ones (whiteouts, tentacles) off, unless it's that one.
+export function isolateHazard(state, kind) {
+  const h = state.cfg.hazards;
+  if (kind !== 'gust') h.gust.random = false;
+  if (kind !== 'tentacle') h.tentacles.random = false;
+}
 export function startHazardTest(state, kind) {
   if (kind === 'fire') armFire(state);
   else spawnHazard(state, kind);
@@ -35,6 +41,7 @@ export function stepHazards(state, input, dt) {
   stepFire(state, dt);
   if (!state.alive) return;
   stepSwarm(state, dt);
+  stepTentacleSchedule(state, dt);
   stepTentacles(state, input, dt);
   if (!state.alive) return;
   stepCold(state, input, dt);

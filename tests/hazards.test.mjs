@@ -12,6 +12,7 @@ function quiet(seed = 'HZ', { keepFlare = false } = {}) {
   const s = createGame(seed);
   if (!keepFlare) s.flares = [];
   s.hordeTarget = 0; s.breakOffTimer = 1e9; s.cfg.horde.repairRampCap = 0;
+  s.cfg.hazards.gust.random = false; s.cfg.hazards.tentacles.random = false; // one hazard at a time
   s.monsters.forEach((m, i) => { m.mode = MODES.SHAMBLE; m.pos = { x: Math.sin(i) * 27, z: Math.cos(i) * 27 }; m.wander = { ...m.pos }; m.wanderT = 1e9; });
   return s;
 }
@@ -213,10 +214,11 @@ test('gust: a warning first, then flares burn fast and the flashlight cuts out; 
 // ---------- zombie ----------
 test('zombie: keeps coming in the beam, grabs you (even on the roof); alternate A/D to shove it off', () => {
   const s = quiet(); s.player.pos = { x: 0, z: 5 }; s.player.yaw = 0;
-  spawnHazard(s, 'zombie'); s.hazards.zombie.pos = { x: 0, z: 12 };
+  spawnHazard(s, 'zombie'); s.hazards.zombie.pos = { x: 0, z: 10 };
   ticks(s, secs(s, 2), { ...idle, flashlight: true });
-  assert.ok(s.hazards.zombie.pos.z < 10, 'the light does not stop it');
-  for (let i = 0; i < secs(s, 8) && s.player.held !== 'zombie'; i++) ticks(s, 1, { ...idle, flashlight: true });
+  assert.ok(s.hazards.zombie.pos.z < 9, 'the light does not stop it');
+  assert.ok(s.hazards.zombie.pos.z > 8.4, 'half speed: about 0.65 m/s');
+  for (let i = 0; i < secs(s, 12) && s.player.held !== 'zombie'; i++) ticks(s, 1, { ...idle, flashlight: true });
   assert.equal(s.player.held, 'zombie');
   ticks(s, 30, (g, i) => ({ yaw: g.player.yaw, ...idle, moveX: Math.floor(i / 4) % 2 ? 1 : -1 }));
   assert.ok(types(s).includes('zombie_shoved'));
@@ -231,33 +233,77 @@ test('zombie: keeps coming in the beam, grabs you (even on the roof); alternate 
   assert.equal(r.player.onCar, false, 'pulled off the roof');
 });
 
-test('zombie: do nothing and it bites (a hit, then it lets go); a bullet staggers it but it never dies', () => {
+test('zombie: do nothing and it bites (a hit, then it lets go)', () => {
   const s = quiet('ZB'); s.player.pos = { x: 0, z: 5 };
   spawnHazard(s, 'zombie'); s.hazards.zombie.pos = { x: 0, z: 5.6 };
   ticks(s, secs(s, 3));
   assert.ok(types(s).includes('zombie_bite'));
   assert.equal(s.player.health, s.cfg.player.maxHealth - 1);
   assert.equal(s.player.held, null);
+});
 
+test('zombie: two hits knock it down; it may get up (1 in 6 every 5 s); two more and it dies; another comes 20 s later', () => {
+  const shoot = (g) => { aimAt(g, g.hazards.zombie.pos); ticks(g, 1, { ...idle, fire: true }); ticks(g, secs(g, 0.4)); };
   const g = quiet('ZS'); g.player.pos = { x: 0, z: 5 }; g.player.reserve = 18;
-  spawnHazard(g, 'zombie'); g.hazards.zombie.pos = { x: 0, z: 12 };
-  for (let i = 0; i < 6; i++) { aimAt(g, g.hazards.zombie.pos); ticks(g, 1, { ...idle, fire: true }); ticks(g, secs(g, 0.4)); }
-  assert.ok(g.events.filter((e) => e.type === 'zombie_hit').length >= 5);
-  assert.ok(g.hazards.zombie, 'still there');
+  spawnHazard(g, 'zombie'); g.hazards.zombie.pos = { x: 0, z: 14 };
+  shoot(g); assert.equal(g.hazards.zombie.state, 'stagger');
+  shoot(g); assert.equal(g.hazards.zombie.state, 'down');
+  const at = { ...g.hazards.zombie.pos };
+  ticks(g, secs(g, 4.5)); assert.equal(g.hazards.zombie.state, 'down');
+  assert.deepEqual(g.hazards.zombie.pos, at, 'it stays put while down');
+  shoot(g); shoot(g);
+  assert.equal(g.hazards.zombie, null, 'dead for good');
+  assert.ok(types(g).includes('zombie_dead'));
+  ticks(g, secs(g, 19)); assert.equal(g.hazards.zombie, null);
+  ticks(g, secs(g, 1.5)); assert.ok(g.hazards.zombie, 'another one came');
+  assert.ok(Math.hypot(g.hazards.zombie.pos.x, g.hazards.zombie.pos.z) > 15, 'from the edge');
+
+  // getting back up: roughly 1 in 6 per 5 s roll
+  let ups = 0; const N = 240;
+  for (let i = 0; i < N; i++) {
+    const z = quiet('ZU' + i); z.player.pos = { x: 8, z: 8 };
+    spawnHazard(z, 'zombie'); Object.assign(z.hazards.zombie, { state: 'down', hits: 2, t: 0, upT: 0, pos: { x: 0, z: -20 } });
+    ticks(z, secs(z, 5.05)); if (z.hazards.zombie.state !== 'down') ups++;
+  }
+  assert.ok(ups / N > 0.09 && ups / N < 0.26, `up on the first roll: ${ups / N}`);
 });
 
 // ---------- general ----------
-test('hazards: a normal night has random whiteouts and nothing else; no rammers in the crowd', () => {
+test('hazards: a normal night has early, frequent whiteouts and a tentacle ~30 s in; no rammers', () => {
   const s = createGame('NORM');
-  ticks(s, secs(s, 40));
-  assert.equal(s.hazards.gust, null, 'no whiteout in the first 45 s');
-  ticks(s, secs(s, 300), (g) => ({ yaw: g.player.yaw, ...idle, flashlight: true })); // a flashlit player survives long enough
-  const hz = s.hazards;
-  assert.ok(!hz.fire && !hz.fireArmed && !hz.swarm && !hz.tentacles.length && !hz.cold && !hz.zombie);
-  const gusts = s.events.filter((e) => e.type === 'gust_warn');
-  assert.ok(gusts.length >= 1, 'at least one whiteout');
-  for (let i = 1; i < gusts.length; i++) assert.ok(gusts[i].t - gusts[i - 1].t >= s.cfg.hazards.gust.gapMin - 1e-6);
+  ticks(s, secs(s, 29.5), (g) => ({ yaw: g.player.yaw, ...idle }));
+  assert.equal(s.hazards.tentacles.length, 0, 'no tentacle before 30 s');
+  assert.ok(s.events.some((e) => e.type === 'gust_warn' && e.t <= s.cfg.hazards.gust.firstMax + 1e-6), 'a whiteout early on');
+  ticks(s, secs(s, 1));
+  assert.equal(s.hazards.tentacles.length, 1, 'the tentacle comes at 30 s');
+  assert.ok(!s.hazards.fire && !s.hazards.fireArmed && !s.hazards.swarm && !s.hazards.cold && !s.hazards.zombie);
   assert.equal(s.monsters.filter((m) => m.kind === 'rammer').length, 0);
+
+  // a long night: whiteouts keep coming, 25–50 s apart
+  const g = createGame('NORM2'); g.cfg.hazards.tentacles.random = false; g.hordeTarget = 0; g.breakOffTimer = 1e9; g.cfg.horde.repairRampCap = 0;
+  ticks(g, secs(g, 200));
+  const gusts = g.events.filter((e) => e.type === 'gust_warn');
+  assert.ok(gusts.length >= 4, `only ${gusts.length} whiteouts in 200 s`);
+  for (let i = 1; i < gusts.length; i++) assert.ok(gusts[i].t - gusts[i - 1].t >= g.cfg.hazards.gust.gapMin - 1e-6);
+});
+
+test('tentacle: once one is driven off, a 1-in-6 chance every 10 s for the next', () => {
+  let first = 0; const N = 240;
+  for (let i = 0; i < N; i++) {
+    const s = quiet('TR' + i); s.cfg.hazards.tentacles.random = true;
+    s.hazards.tentFirstDone = true; // the 30 s one has been and gone
+    ticks(s, secs(s, 10.05)); if (s.hazards.tentacles.length) first++;
+  }
+  assert.ok(first / N > 0.09 && first / N < 0.26, `came on the first roll: ${first / N}`);
+});
+
+test('health comes back: 6 s without damage, then one hit back every 3 s', () => {
+  const s = quiet('REGEN'); s.player.pos = { x: 6, z: 6 };
+  s.player.health = 1; ticks(s, 1);
+  ticks(s, secs(s, 5.5)); assert.equal(s.player.health, 1);
+  ticks(s, secs(s, 4)); assert.equal(s.player.health, 2);
+  ticks(s, secs(s, 3.2)); assert.equal(s.player.health, 3);
+  assert.equal(s.events.filter((e) => e.type === 'healed').length, 2);
 });
 
 test('hazards: swarm and cold are backlogged (not in the sandbox list)', async () => {
@@ -272,4 +318,38 @@ test('hazards: each one runs on its own for a minute without errors', () => {
     ticks(a, secs(a, 60), (g, i) => ({ yaw: g.player.yaw + 0.02, ...idle, moveZ: i % 300 < 150 ? 1 : 0, moveX: i % 16 < 8 ? 1 : -1, flashlight: i % 120 < 60, fire: i % 90 === 0 }));
     assert.ok(a.t > 1, k);
   }
+});
+
+test('whiteout flicker does not click the flashlight (only what the player does clicks)', () => {
+  const s = quiet('CLICK'); spawnHazard(s, 'gust');
+  ticks(s, secs(s, 9), { ...idle, flashlight: true });
+  assert.equal(s.events.filter((e) => e.type === 'flash_on' || e.type === 'flash_off').length, 1, 'one click: turning it on');
+});
+
+test('tentacle: run up to it and press E to stomp it — it lets go and runs; a car spot does not take that press', () => {
+  const s = quiet('STOMP'); spawnHazard(s, 'tentacle');
+  const T = s.hazards.tentacles[0];
+  T.state = 'drag'; T.origin = { x: 0, z: 18 }; T.tip = { x: 0.6, z: 2.2 }; T.path = [{ x: 0, z: 18 }, { x: 0.3, z: 8 }, { x: 0.5, z: 4 }];
+  s.strobes = [false, false];
+  s.player.pos = { x: 0.9, z: 4.4 };
+  ticks(s, 1);
+  assert.ok(s.hazards.stompable, 'in stomp range');
+  ticks(s, 1, { ...idle, interact: true });
+  assert.ok(types(s).includes('tentacle_stomped'));
+  assert.equal(T.state, 'retract');
+  const far = quiet('STOMP2'); spawnHazard(far, 'tentacle'); far.player.pos = { x: 8, z: 8 };
+  ticks(far, 1, { ...idle, interact: true });
+  assert.ok(!types(far).includes('tentacle_stomped'), 'too far away');
+});
+
+test('unlimited ammo: reload whenever the magazine is not full; no reserve runs out', () => {
+  const s = quiet('AMMO'); s.player.pos = { x: 0, z: 5 };
+  for (let i = 0; i < 30; i++) {
+    s.player.fireCd = 0; s.player.reloading = 0; s.player.mag = s.player.mag || 6;
+    ticks(s, 1, { ...idle, fire: true });
+    if (s.player.mag === 0) { ticks(s, 1, { ...idle, reload: true }); ticks(s, secs(s, 2.6)); }
+  }
+  assert.equal(s.player.reserve, Infinity);
+  s.player.mag = 5; ticks(s, 1, { ...idle, reload: true });
+  assert.ok(s.player.reloading > 0, 'can reload with 5 in the gun');
 });

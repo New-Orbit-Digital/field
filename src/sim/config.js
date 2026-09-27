@@ -41,6 +41,8 @@ export const CONFIG = {
     mantleMinHeight: 0.15, // must actually be off the ground
     mantleFaceAngle: 50 * DEG,
     mantleTime: 0.75,      // hauling yourself up: vulnerable, no actions
+    regenDelay: 6,         // no damage for this long and you start to recover…
+    regenEvery: 3,         // …one hit back every this many seconds, up to full (Justin, packet 07)
   },
   perception: {
     viewHalfAngle: 45 * DEG,
@@ -59,20 +61,21 @@ export const CONFIG = {
   },
   pistol: {
     magSize: 6,
-    startReserve: 6,
-    maxReserve: 18,
+    startReserve: Infinity, // unlimited: only the 6 in the gun and the reload limit you (Justin, packet 07)
+    maxReserve: Infinity,   // so there's no trip to the trunk for ammo any more
     fireCooldown: 0.35,
     reloadTime: 2.4,       // both hands busy: no flashlight, no firing
     perfectStartMin: 0.35, // 'perfect reload' zone starts somewhere in here (fraction of the bar)…
     perfectStartMax: 0.6,
     perfectWidth: 0.12,    // …and is this wide. Hit R inside it: instant reload.
     jamPenalty: 1.2,       // hit R outside it: jammed, this much longer
-    recoilKick: 0.045,     // aim/flashlight waver per shot (radians)
-    recoilMax: 0.09,
-    recoilDecay: 0.12,     // radians per second
+    recoilKick: 0.022,     // aim/flashlight waver per shot (radians) — halved in packet 07 (aiming felt imprecise)
+    recoilMax: 0.045,
+    recoilDecay: 0.3,      // radians per second — settles ~2.5x faster than before
     recoilWobbleHz: 7,
     range: 30,
     aimTolerance: 3 * DEG, // plus the monster's body width at range
+    aimAssist: 3 * DEG,    // a little extra pull toward whatever's nearest the aim line (packet 07)
     bodyRadius: 0.45,
     pickupAmount: 6,
     pickupTime: 1.2,
@@ -173,9 +176,8 @@ export const CONFIG = {
     deepDarkPack: 3,       // how many of the crowd come for you at once
     deepDarkRange: 16,     // …from this close
   },
-  // Hazards (packet 05, second revision). Whiteouts (gust.random) are part of a normal night; fire, tentacle
-  // and zombie are tested one at a time in the sandbox (?hazard) until they're scheduled. Swarm and cold are
-  // backlogged (code kept).
+  // Hazards (packet 05, revised in packet 07). Whiteouts and the tentacle are part of a normal night (random);
+  // fire and zombie are tested in the sandbox (?hazard) until they're scheduled. Swarm and cold are backlogged.
   hazards: {
     fire: {
       igniteEvery: 10, igniteChance: 1 / 6, // once the first flare's out: every 10 s, a 1-in-6 chance it catches (Justin's call)
@@ -209,6 +211,10 @@ export const CONFIG = {
       hitsToSever: 2,
       retractSpeed: 5,
       bodyRadius: 0.5,
+      stompRange: 1.1,         // run up to it and press E to stomp it: it lets go and runs (Justin, packet 07)
+      random: true,            // part of a normal night: the first one ~30 s in…
+      firstAt: 30,
+      rollEvery: 10, rollChance: 1 / 6, // …then, once it's driven off, a 1-in-6 chance every 10 s (Justin's call)
     },
     cold: {
       max: 100,
@@ -220,23 +226,28 @@ export const CONFIG = {
       slowMult: 0.55,          // at zero: slowed, no damage (Justin's call)
     },
     gust: {
-      warnTime: 1.2, blowTime: 8,
+      warnTime: 1.2, blowTime: 9, rampTime: 3, // ramps up over 3 s, holds, ramps down over the last 3 s
+      peak: 0.8,               // how hard the snow gets at the top (0.8 = 20% under packet 06's peak)
       flareBurnMult: 3,
       flickerEvery: 0.12, flickerOffChance: 0.35,
       random: true,            // part of a normal night: they blow in at random (Justin's call)
-      firstMin: 45, firstMax: 90, // the first one somewhere in here…
-      gapMin: 60, gapMax: 120,  // …then one every so often
+      firstMin: 3, firstMax: 25, // no long wait: the first one comes early…
+      gapMin: 25, gapMax: 50,   // …and they keep coming (a run lasts ~2–3 min)
       // the renderer piles on snow and drives it hard in one direction (no fog change)
     },
     zombie: {
-      speed: 1.3,              // slow, but light doesn't stop it
+      speed: 0.65,             // slow (halved, Justin), but light doesn't stop it
       spawnDist: 20,
       grabRange: 0.8,
       shoveFree: 6,            // alternate A/D this many times to shove it off…
       biteAfter: 2.5,          // …before it bites (a hit, and it lets go)
       shoveDist: 4,
       staggerTime: 1.5,        // after a shove
-      shotStagger: 0.8,        // a bullet stops it for a moment; it doesn't die
+      shotStagger: 0.8,        // a bullet stops it for a moment
+      hitsToDown: 2,           // two hits knock it down…
+      getUpEvery: 5, getUpChance: 1 / 6, // …and every 5 s it has a 1-in-6 chance of getting back up
+      hitsToKill: 4,           // two more hits (standing or down) and it's dead for good
+      respawnAfter: 20,        // then another comes in from the edge
       bodyRadius: 0.45,
     },
   },

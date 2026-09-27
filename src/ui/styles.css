@@ -3,45 +3,46 @@
 html, body { margin: 0; height: 100%; background: #000; color: var(--fg); font: 14px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace; overflow: hidden; }
 #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: none; }
 #hud { position: fixed; inset: 0; pointer-events: none; }
-#time { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); font-size: 20px; letter-spacing: 0.12em; text-shadow: 0 0 8px #000; }
-#objective { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); color: var(--amber); font-size: 13px; letter-spacing: .08em; text-shadow: 0 0 6px #000; white-space: nowrap; }
-#demoTag { position: absolute; top: 84px; left: 50%; transform: translateX(-50%); color: var(--dim); font-size: 11px; letter-spacing: .15em; }
 #status { position: absolute; left: 22px; bottom: 22px; display: grid; gap: 7px; }
-#hp { display: flex; gap: 6px; }
-.pip { width: 16px; height: 16px; border-radius: 50%; background: var(--fg); box-shadow: 0 0 6px rgba(255,255,255,.4); }
-.pip.lost { background: transparent; border: 1px solid var(--dim); box-shadow: none; }
-#batt { width: 140px; height: 8px; border: 1px solid var(--dim); position: relative; }
-#battFill { position: absolute; inset: 0 auto 0 0; background: #f5e9c8; }
-#batt.low #battFill { background: #d9a441; }
-#batt.locked #battFill { background: #7a3030; }
 .label { color: var(--dim); font-size: 11px; letter-spacing: .1em; }
 #weapons { position: absolute; right: 22px; bottom: 22px; text-align: right; display: grid; gap: 6px; justify-items: end; }
-#ammo { display: flex; align-items: center; gap: 12px; }
-#ammo .count { font-size: 20px; letter-spacing: .08em; }
-#ammo .count.empty { color: var(--red); }
 .hint { color: var(--dim); font-size: 12px; display: inline-flex; align-items: center; gap: 6px; }
 .hint.flare { color: #ff9a6a; }
 .key { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border: 1px solid rgba(232,236,242,.7); border-bottom-width: 3px; border-radius: 4px; color: var(--fg); font-size: 11px; font-weight: 700; line-height: 1; background: rgba(255,255,255,.06); }
 #prompt .key { margin-right: 6px; }
 #aim { position: absolute; left: 0; top: 0; width: 0; height: 0; }
-#aim .dot { position: absolute; left: -2.5px; top: -2.5px; width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.8); box-shadow: 0 0 3px #000; }
-#reloadBar { position: absolute; left: -45px; top: 14px; width: 90px; height: 5px; background: rgba(0,0,0,.55); border: 1px solid rgba(232,236,242,.45); }
+#aim .dot { position: absolute; left: -3.75px; top: -3.75px; width: 7.5px; height: 7.5px; border-radius: 50%; background: rgba(255,255,255,.8); box-shadow: 0 0 3px #000; }
+#reloadBar { position: absolute; left: -45px; top: 16px; width: 90px; height: 5px; background: rgba(0,0,0,.55); border: 1px solid rgba(232,236,242,.45); }
 #reloadZone { position: absolute; top: -1px; bottom: -1px; background: rgba(255,255,255,.85); }
 #reloadMark { position: absolute; top: -4px; width: 2px; height: 11px; margin-left: -1px; background: var(--amber); }
 #reloadBar.used #reloadZone { opacity: .25; }
 #reloadBar.jam { border-color: var(--red); }
 #reloadBar.jam #reloadMark { background: var(--red); }
 #prompt { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); color: var(--fg); font-size: 14px; text-shadow: 0 0 6px #000; white-space: nowrap; }
-#progress { position: absolute; left: 50%; bottom: 80px; transform: translateX(-50%); width: 220px; height: 6px; border: 1px solid var(--dim); }
-#progressFill { position: absolute; inset: 0 auto 0 0; background: var(--amber); }
-#toast { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); color: var(--fg); font-size: 15px; opacity: 0; transition: opacity .4s; text-shadow: 0 0 8px #000; text-align: center; max-width: 90vw; }
-#toast.show { opacity: 1; }
 #frost { position: fixed; inset: 0; pointer-events: none; opacity: 0; box-shadow: inset 0 0 160px 70px rgba(190,215,240,.55); transition: opacity .5s; }
-#hazardLine { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); color: var(--red); font-size: 13px; letter-spacing: .1em; text-shadow: 0 0 6px #000; white-space: nowrap; }
 #warm { width: 140px; height: 6px; border: 1px solid var(--dim); position: relative; }
 #warmFill { position: absolute; inset: 0 auto 0 0; background: #9fd0ff; }
 #warm.numb #warmFill { background: #e8f4ff; animation: blink .8s infinite; }
 #prompt.urgent { color: #ff8080; font-weight: 700; }
+/* packet 07: interaction prompts hover at the spot; battery + ammo beside your head while aiming; health bar under your feet */
+#spotPrompt { position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); display: grid; gap: 6px; justify-items: center; padding: 7px 12px; background: rgba(0,0,0,.62); border: 1px solid rgba(232,236,242,.35); border-radius: 6px; font-size: 18px; font-weight: 700; letter-spacing: .04em; color: #fff; white-space: nowrap; text-shadow: 0 0 6px #000; }
+#spotPrompt .key { min-width: 24px; height: 24px; font-size: 14px; margin-right: 8px; }
+#spotPrompt.dim { color: var(--dim); font-weight: 400; font-size: 15px; }
+#spotProg { width: 120px; height: 5px; border: 1px solid rgba(232,236,242,.5); position: relative; }
+#spotProgFill { position: absolute; inset: 0 auto 0 0; background: var(--amber); }
+#aimHud { position: absolute; left: 0; top: 0; display: grid; gap: 6px; justify-items: center; filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000) drop-shadow(0 1px 2px #000); } /* no box: just outlined so it reads on snow */
+#hpBar { position: absolute; left: 0; top: 0; width: 120px; height: 13px; border: 2px solid #000; background: rgba(0,0,0,.6); box-sizing: border-box; }
+#hpFill { height: 100%; background: #e8202a; transition: width .25s; }
+#battIcon { position: relative; width: 38px; height: 17px; border: 2px solid #fff; border-radius: 3px; padding: 2px; box-sizing: border-box; }
+#battIcon::after { content: ''; position: absolute; right: -6px; top: 3px; width: 4px; height: 7px; background: #fff; border-radius: 0 2px 2px 0; }
+#battLevel { height: 100%; background: repeating-linear-gradient(-55deg, #fff 0 4px, transparent 4px 6px); }
+#battIcon.low { border-color: var(--red); } #battIcon.low::after { background: var(--red); }
+#battIcon.low #battLevel { background: repeating-linear-gradient(-55deg, var(--red) 0 4px, transparent 4px 6px); }
+#battIcon.dead { animation: blink .6s infinite; }
+#ammoDots { display: grid; grid-template-columns: repeat(3, 10px); gap: 3px 4px; }
+#ammoDots i { width: 10px; height: 10px; border-radius: 50%; background: #fff; box-sizing: border-box; }
+#ammoDots i.spent { background: transparent; border: 2px solid rgba(255,255,255,.75); }
+#prompt { font-size: 17px; font-weight: 700; }
 #vignette { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 180px 60px rgba(0,0,0,.85); }
 #vignette.hit { animation: hit .7s ease-out; }
 @keyframes hit { 0% { box-shadow: inset 0 0 220px 120px rgba(160,0,0,.9); } 100% { box-shadow: inset 0 0 180px 60px rgba(0,0,0,.85); } }
@@ -66,5 +67,5 @@ h1 .r { color: var(--red); } h1 .b { color: var(--blue); }
 #minimap { width: 220px; height: 220px; border: 1px solid #333; }
 @media (max-width: 600px) {
   h1 { font-size: 44px; } .controls { font-size: 12px; } #minimap { width: 150px; height: 150px; }
-  #prompt { font-size: 12px; bottom: 120px; } #objective { font-size: 12px; }
+  #prompt { font-size: 12px; bottom: 120px; }
 }

@@ -11,7 +11,7 @@ import { createSnowMarks } from './snowMarks.js';
 import { createImpacts } from './impacts.js';
 import { createPuffs, createExhaust } from './puffs.js';
 import { createTracks } from './tracks.js';
-import { carToWorld, carDirToWorld, forward } from '../sim/game.js';
+import { carToWorld, carDirToWorld, forward, spotWorld } from '../sim/game.js';
 import { buildSnow } from './snow.js';
 import { createFollowCamera } from './followCamera.js';
 import { buildDebugRings } from './debugRings.js';
@@ -126,6 +126,28 @@ export function createWorld(canvas, cfg) {
     }
   }
 
+  // Screen position (px) of a world point, for HUD elements pinned to the scene.
+  const tmpV = new THREE.Vector3();
+  function toScreen(x, y, z) {
+    const p = tmpV.set(x, y, z).project(cam.camera);
+    return { x: (p.x + 1) / 2 * canvas.clientWidth, y: (1 - p.y) / 2 * canvas.clientHeight, visible: p.z < 1 && p.z > -1 };
+  }
+  // the player's head and feet (battery + ammo sit beside the head; the health bar under the feet)
+  function headScreen(state) {
+    const P = state.player;
+    return toScreen(P.pos.x, (P.mantle > 0 ? cfg.car.top : P.y) + 1.7, P.pos.z);
+  }
+  function feetScreen(state) {
+    const P = state.player;
+    return toScreen(P.pos.x, (P.mantle > 0 ? cfg.car.top : P.y) - 0.05, P.pos.z);
+  }
+  function worldScreen(p, y = 0.3) { return toScreen(p.x, y, p.z); }
+  // the hull point you're working on at a car spot (the interaction prompt hovers there)
+  function spotScreen(state, name) {
+    const f = spotWorld(state.cfg, name).face;
+    return toScreen(f.x, 1.35, f.z);
+  }
+
   // Screen position (px) of where the gun/flashlight is pointing, for the aim dot.
   function aimScreen() {
     const p = playerRig.aimPoint.clone().project(cam.camera);
@@ -135,5 +157,5 @@ export function createWorld(canvas, cfg) {
   resize();
   function reset() { beasts.reset(); marks.reset(); tracks.reset(); hazardRig.reset(); scenery.reset(); }
 
-  return { renderer, psx: psxOn, scene, camera: cam.camera, update, resize, onEvent, reset, aimScreen, modelsReady, loadedModels, playerRig, scenery };
+  return { renderer, psx: psxOn, scene, camera: cam.camera, update, resize, onEvent, reset, aimScreen, headScreen, feetScreen, worldScreen, spotScreen, modelsReady, loadedModels, playerRig, scenery };
 }

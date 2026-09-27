@@ -13,7 +13,7 @@ export function createAudio() {
   const { ctx } = engine;
   const { crunch, breath, growl, shriek, thud, heartbeat, click, gunshot, metalClick, hiss, blip, scrape, moan, clang, glass } = createSounds(engine);
   const ambience = createAmbience(engine);
-  const { radioBurst, startSiren } = ambience;
+  const { radioBurst, startSiren, muteWind } = ambience;
   const sfx = createSamples(engine);
   const pick = (names) => names[Math.floor(Math.random() * names.length)];
   let reloadSnd = null;
@@ -23,7 +23,7 @@ export function createAudio() {
   let engineLoop = null, hazardLoop = null;
   function startLoops(cfg) {
     if (!engineLoop) {
-      engineLoop = sfx.loop('engine-loop', { pos: { x: 0, y: 1.58, z: 0 }, gain: 0.22, ref: 1.5, rolloff: 1.3, randomStart: false });
+      engineLoop = sfx.loop('engine-loop', { pos: { x: 0, y: 1.58, z: 0 }, gain: 0.308, ref: 1.5, rolloff: 1.3, randomStart: false }); // +40% (Justin, packet 07)
       hazardLoop = sfx.loop('hazard-lights', { pos: { x: 0, y: 1.0, z: 0 }, gain: 1.4, ref: 1.5, rolloff: 1.2, randomStart: false });
     }
     const pipe = carToWorld(cfg, { x: -cfg.car.halfLength - 0.1, z: 0.45 });
@@ -31,6 +31,27 @@ export function createAudio() {
     const front = carToWorld(cfg, { x: cfg.car.halfLength + 0.1, z: 0 });
     hazardLoop.setPos(front.x, front.z, 1.0);
   }
+  // The recorded wind: always looping, all night (it sits on the listener, so it isn't positional).
+  let windLoop = null, whiteLoop = null, whiteStopT = null;
+  function tickWind(P) {
+    if (!windLoop && sfx.has('wind-ambience')) { windLoop = sfx.loop('wind-ambience', { pos: { x: P.pos.x, y: 3, z: P.pos.z }, gain: 0.9, ref: 50, rolloff: 0.01 }); muteWind(); }
+    windLoop?.setPos(P.pos.x, P.pos.z, 3);
+    whiteLoop?.setPos(P.pos.x, P.pos.z, 3);
+  }
+  // Whiteout: its own recorded loop on top of the wind, faded in for the blow and out after.
+  function whiteoutStart(P) {
+    if (!sfx.has('whiteout')) { hiss(P.pos.x, P.pos.z, 8, 0.5, 500); return; }
+    if (whiteStopT) { clearTimeout(whiteStopT); whiteStopT = null; }
+    if (!whiteLoop) whiteLoop = sfx.loop('whiteout', { pos: { x: P.pos.x, y: 3, z: P.pos.z }, gain: 0, ref: 50, rolloff: 0.01, randomStart: false });
+    whiteLoop.setGain(1.3, 0.4);
+  }
+  function whiteoutEnd() {
+    if (!whiteLoop) return;
+    whiteLoop.setGain(0, 0.8);
+    const l = whiteLoop; whiteLoop = null;
+    whiteStopT = setTimeout(() => { l.stop(); whiteStopT = null; }, 4000);
+  }
+
   // The hazard file ticks every 0.3814 s, first tick at 0.0376 s; the lamps are on from each tick to the next tock.
   const HAZ_TICK = 0.3814, HAZ_FIRST = 0.0376;
   function hazardOn() {
@@ -45,9 +66,14 @@ export function createAudio() {
   const stepLoops = new Map(); // id -> { loop, lastX, lastZ }
   const LOUD_MODES = new Set([MODES.STALK, MODES.PROBE, MODES.COMMIT, MODES.RETREAT, MODES.GONE, MODES.APPROACH, MODES.RAM]);
   const CROWD_EAR = 15, CROWD_VOICES = 3;
+  let stepSimT = null;
   function tickFootsteps(dt, state) {
     if (!sfx.has('monster-footsteps')) return;
     const P = state.player;
+    if (stepSimT != null && state.t < stepSimT) stepSimT = null; // a new night started
+    const simDt = stepSimT == null ? 0 : state.t - stepSimT;
+    if (simDt <= 0 && stepSimT != null) return; // no sim step since last frame: leave the loops as they are
+    stepSimT = state.t;
     const near = state.monsters
       .filter((m) => m.mode === MODES.SHAMBLE && Math.hypot(m.pos.x - P.pos.x, m.pos.z - P.pos.z) < CROWD_EAR)
       .sort((a, b) => Math.hypot(a.pos.x - P.pos.x, a.pos.z - P.pos.z) - Math.hypot(b.pos.x - P.pos.x, b.pos.z - P.pos.z))
@@ -60,7 +86,7 @@ export function createAudio() {
       alive.add(m.id);
       let s = stepLoops.get(m.id);
       if (!s) { s = { loop: sfx.loop('monster-footsteps', { pos: { x: m.pos.x, y: 0.2, z: m.pos.z }, gain: 0, ref: 2, rolloff: 1.2 }), lastX: m.pos.x, lastZ: m.pos.z }; stepLoops.set(m.id, s); }
-      const speed = Math.hypot(m.pos.x - s.lastX, m.pos.z - s.lastZ) / Math.max(dt, 1e-3);
+      const speed = Math.hypot(m.pos.x - s.lastX, m.pos.z - s.lastZ) / Math.max(simDt, 1e-3);
       s.lastX = m.pos.x; s.lastZ = m.pos.z;
       s.loop.setPos(m.pos.x, m.pos.z, 0.2);
       let gain = 0;
@@ -149,7 +175,9 @@ export function createAudio() {
         sfx.play('growl4', { pos: { x: pos.x, y: 1, z: pos.z }, gain: 1.1, rate: 0.8 });
         for (let i = 0; i < 6; i++) clang(pos.x, pos.z, { gain: 0.45, when: 0.1 + i * 0.26 + Math.random() * 0.05, freq: 380 + Math.random() * 120 });
         break;
-      case 'lights_smashed': glass(pos.x, pos.z); clang(pos.x, pos.z, { gain: 0.6, freq: 300 }); break;
+      case 'lights_smashed':
+        if (!sfx.play('glass-breaking', { pos: { x: pos.x, y: 1.2, z: pos.z }, gain: 1.4, rate: 0.95 + Math.random() * 0.1 })) { glass(pos.x, pos.z); clang(pos.x, pos.z, { gain: 0.6, freq: 300 }); }
+        break;
       // rammers: snorting and pawing, the charge, the impact
       case 'ram_windup':
         if (!sfx.play('growl3', { pos: { x: pos.x, y: 0.8, z: pos.z }, gain: 1.3, rate: 0.72 })) growl(pos.x, pos.z, cfg.monster.windupTime);
@@ -215,17 +243,23 @@ export function createAudio() {
       case 'swarm_hit': crunch(pos.x, pos.z, { gain: 0.25, pitch: 1.8 }); break;
       case 'swarm_scattered': hiss(pos.x, pos.z, 1.2, 0.25, 7000); break;
       case 'tentacle_start': scrape(pos.x, pos.z, 1.5); break;
-      case 'tentacle_smash': for (let i = 0; i < 5; i++) clang(pos.x, pos.z, { gain: 0.4, when: i * 0.3, freq: 400 + Math.random() * 120 }); break;
+      case 'tentacle_smash': scrape(pos.x, pos.z, cfg.hazards.tentacles.smashTime); break; // then glass-breaking on lights_smashed
       case 'tentacle_drag': scrape(pos.x, pos.z, 3); clang(pos.x, pos.z, { gain: 0.5, freq: 150 }); break;
       case 'tentacle_hit': crunch(pos.x, pos.z, { gain: 0.3, pitch: 0.6 }); break;
       case 'tentacle_severed': moan(pos.x, pos.z); break;
+      case 'tentacle_stomped': thud(); crunch(pos.x, pos.z, { gain: 0.8, pitch: 0.5 }); moan(pos.x, pos.z); break;
       case 'struggle': crunch(null, null, { gain: 0.2, pitch: 0.9 }); break;
-      case 'gust_warn': hiss(pos.x, pos.z, cfg.hazards.gust.warnTime + cfg.hazards.gust.blowTime, 0.5, 500); break;
+      case 'gust_warn': hiss(pos.x, pos.z, cfg.hazards.gust.warnTime, 0.3, 700); break;
+      case 'gust_start': whiteoutStart(state.player); break;
+      case 'gust_end': whiteoutEnd(); break;
       case 'zombie_start': moan(pos.x, pos.z); break;
       case 'zombie_grab': thud(); growl(pos.x, pos.z, 0.8); break;
       case 'zombie_bite': growl(pos.x, pos.z, 0.4); break;
       case 'zombie_shoved': crunch(pos.x, pos.z, { gain: 0.5, pitch: 0.7 }); break;
       case 'zombie_hit': crunch(pos.x, pos.z, { gain: 0.35, pitch: 0.6 }); break;
+      case 'zombie_down': thud(); crunch(pos.x, pos.z, { gain: 0.6, pitch: 0.5 }); break;
+      case 'zombie_up': moan(pos.x, pos.z); break;
+      case 'zombie_dead': growl(pos.x, pos.z, 0.5); break;
       case 'rescued': case 'death': heartbeat(10, 0.9); break;
     }
   }
@@ -236,6 +270,7 @@ export function createAudio() {
   function tick(dt, state, moving) {
     const P = state.player;
     startLoops(state.cfg);
+    tickWind(P);
     tickFootsteps(dt, state);
     tickFarGrowls(dt, state);
     tickPassingCar(dt, state);
@@ -268,7 +303,10 @@ export function createAudio() {
       stepLoops.clear();
       reloadSnd?.stop(); reloadSnd = null;
       if (car) { car.loop.stop(); car = null; }
+      whiteLoop?.stop(); whiteLoop = null;
     },
     hazardOn,
+    // the run's over: the monsters stop moving, so their footstep loops shouldn't keep going (they did)
+    onGameOver() { for (const s of stepLoops.values()) s.loop.setGain(0, 0.3); whiteoutEnd(); },
   };
 }

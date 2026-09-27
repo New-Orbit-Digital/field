@@ -1,7 +1,8 @@
 // Zombie (replaces the statue and the under-car crawler): it just keeps coming, light or no light. It's
 // slow, but it grabs you — off the roof, too — and you have a couple of seconds to shove it off by
-// alternating A/D before it bites (a hit, and it lets go). A shove knocks it back and it staggers; a bullet
-// stops it for a moment. It doesn't die.
+// alternating A/D before it bites (a hit, and it lets go). A shove knocks it back and it staggers.
+// Bullets: each one stops it for a moment; two knock it down (every 5 s a 1-in-6 chance it gets back up);
+// two more and it's dead for good — and another one comes in from the edge 20 s later.
 import { emit } from '../events.js';
 import { pushOutOfCar } from '../car.js';
 import { bearingTo, dist, forward, moveToward } from '../math.js';
@@ -12,15 +13,23 @@ export function spawnZombie(state) {
   const hz = state.hazards;
   if (hz.zombie) return;
   const pos = farFromPlayer(state, state.cfg.hazards.zombie.spawnDist);
-  hz.zombie = { pos, yaw: bearingTo(pos, state.player.pos), state: 'walk', t: 0, alt: 0, lastAD: 0 };
+  hz.zombie = { pos, yaw: bearingTo(pos, state.player.pos), state: 'walk', t: 0, alt: 0, lastAD: 0, hits: 0 };
+  hz.zombieRespawn = null;
   emit(state, 'zombie_start', { pos: { ...pos } });
 }
 
 export function stepZombie(state, input, dt) {
-  const Z = state.hazards.zombie;
+  const hz = state.hazards;
+  if (hz.zombieRespawn != null) { hz.zombieRespawn -= dt; if (hz.zombieRespawn <= 0) spawnZombie(state); }
+  const Z = hz.zombie;
   if (!Z) return;
   const zc = state.cfg.hazards.zombie, P = state.player, cfg = state.cfg;
   Z.t += dt;
+  if (Z.state === 'down') {
+    Z.upT = (Z.upT || 0) + dt;
+    if (Z.upT >= zc.getUpEvery) { Z.upT = 0; if (state.rng.chance(zc.getUpChance)) { Z.state = 'walk'; Z.t = 0; emit(state, 'zombie_up', { pos: { ...Z.pos } }); } }
+    return;
+  }
   if (Z.state === 'stagger') { if (Z.t >= Z.stagger) { Z.state = 'walk'; Z.t = 0; } return; }
   if (Z.state === 'walk') {
     moveToward(Z.pos, P.pos, zc.speed * dt);
@@ -59,14 +68,23 @@ export function stepZombie(state, input, dt) {
   }
 }
 
-// A bullet stops it for a moment (and breaks a grab); it doesn't die.
+// A bullet stops it for a moment (and breaks a grab); two knock it down, four kill it.
 export function zombieTargets(state) {
   const Z = state.hazards.zombie;
   if (!Z) return [];
-  return [{ pos: Z.pos, radius: state.cfg.hazards.zombie.bodyRadius, onHit() {
+  const zc = state.cfg.hazards.zombie;
+  return [{ pos: Z.pos, radius: zc.bodyRadius, onHit() {
     const P = state.player;
     if (Z.state === 'grab') { P.held = null; P.invuln = Math.max(P.invuln, 0.8); }
-    Z.state = 'stagger'; Z.t = 0; Z.stagger = state.cfg.hazards.zombie.shotStagger;
-    emit(state, 'zombie_hit', { pos: { ...Z.pos } });
+    Z.hits++;
+    emit(state, 'zombie_hit', { pos: { ...Z.pos }, hits: Z.hits });
+    if (Z.hits >= zc.hitsToKill) {
+      state.hazards.zombie = null;
+      state.hazards.zombieRespawn = zc.respawnAfter;
+      emit(state, 'zombie_dead', { pos: { ...Z.pos } });
+    } else if (Z.hits === zc.hitsToDown) {
+      Z.state = 'down'; Z.t = 0; Z.upT = 0;
+      emit(state, 'zombie_down', { pos: { ...Z.pos } });
+    } else if (Z.state !== 'down') { Z.state = 'stagger'; Z.t = 0; Z.stagger = zc.shotStagger; }
   } }];
 }

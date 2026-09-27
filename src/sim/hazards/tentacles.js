@@ -1,6 +1,7 @@
 // Tentacles (revised): they go for the car, not you. One creeps in from the dark (light slows it), reaches
 // the wreck, bursts the flashing lights one side at a time, then hauls the car toward the dark. If the car
-// ends up too far from where it started, it's gone — and so are you. Shoot it twice to sever it.
+// ends up too far from where it started, it's gone — and so are you. Shoot it twice to sever it, or run up
+// and stomp on it (E).
 // (This replaces the rammer, the monster that shoved the car.)
 import { emit } from '../events.js';
 import { carClosestPoint, carDistance, pushOutOfCar } from '../car.js';
@@ -23,9 +24,30 @@ function slowed(state, pos) {
   return inBeam(state, pos) || !!inFlare(state, pos) || (L && dist(L.pos, pos) < L.radius);
 }
 
-function sever(state, T) {
+function sever(state, T, how = 'shot') {
   T.state = 'retract';
-  emit(state, 'tentacle_severed', { id: T.id, pos: { ...T.tip } });
+  emit(state, how === 'stomp' ? 'tentacle_stomped' : 'tentacle_severed', { id: T.id, pos: { ...T.tip } });
+}
+
+// Stomp: close enough to any part of it (on the ground, hands free) and E sends it running.
+function stepStomp(state, input) {
+  const hz = state.hazards, tc = state.cfg.hazards.tentacles, P = state.player;
+  hz.stompable = null;
+  if (!input.interact) P.stompLatch = false;
+  if (!P.grounded || P.onCar || P.held || P.mantle > 0 || P.reloading > 0) return;
+  let best = null, bd = tc.stompRange;
+  for (const T of hz.tentacles) {
+    if (T.state === 'retract') continue;
+    for (const p of [...T.path.slice(1), T.tip]) { const d = dist(p, P.pos); if (d < bd) { bd = d; best = { T, pos: { ...p } }; } }
+  }
+  if (!best) return;
+  hz.stompable = { id: best.T.id, pos: best.pos };
+  if (input.interact && !P.stompLatch) {
+    P.stompLatch = true;
+    P.interacting = false; P.interactBlock = true; // this press was for the stomp, not the car
+    sever(state, best.T, 'stomp');
+    hz.stompable = null;
+  }
 }
 
 // Move the wreck by (dx, dz), taking you along if you're on the roof.
@@ -36,9 +58,20 @@ function haulCar(state, dx, dz) {
   else pushOutOfCar(cfg, P.pos, cfg.player.radius);
 }
 
+// Normal night: the first one ~30 s in; after that, whenever none is out, a 1-in-6 roll every 10 s.
+export function stepTentacleSchedule(state, dt) {
+  const hz = state.hazards, tc = state.cfg.hazards.tentacles;
+  if (!tc.random) return;
+  if (hz.tentacles.length) { hz.tentRollT = 0; return; }
+  if (!hz.tentFirstDone) { if (state.t >= tc.firstAt) { hz.tentFirstDone = true; spawnTentacle(state); } return; }
+  hz.tentRollT = (hz.tentRollT || 0) + dt;
+  if (hz.tentRollT >= tc.rollEvery) { hz.tentRollT = 0; if (state.rng.chance(tc.rollChance)) spawnTentacle(state); }
+}
+
 export function stepTentacles(state, input, dt) {
   const hz = state.hazards, tc = state.cfg.hazards.tentacles, cfg = state.cfg;
   if (!hz.carStart) hz.carStart = { x: cfg.car.x || 0, z: cfg.car.z || 0 };
+  stepStomp(state, input);
   for (const T of hz.tentacles) {
     T.t += dt;
     if (T.state === 'creep') {

@@ -29,32 +29,39 @@ export function finishReload(state, perfect) {
   emit(state, perfect ? 'reload_perfect' : 'reload_done', { mag: P.mag, reserve: P.reserve });
 }
 
-export function fire(state) {
+// What a shot fired right now would hit: the nearest monster or hazard target within the aim cone (tolerance +
+// body width + a little aim assist). The renderer puts the aim dot on it, so the dot shows the real hit.
+export function aimTarget(state) {
   const { player: P, cfg } = state;
-  const aim = aimYaw(state); // the shot goes where you're pointing right now, waver included
-  P.mag--;
-  P.fireCd = cfg.pistol.fireCooldown;
-  P.recoil = Math.min(cfg.pistol.recoilMax, P.recoil + cfg.pistol.recoilKick);
-  P.recoilPhase = state.rng.range(0, Math.PI * 2);
-  scatterSwarm(state); // any shot, hit or miss, scatters the swarm
+  const aim = aimYaw(state);
+  const cone = (r, d) => cfg.pistol.aimTolerance + (cfg.pistol.aimAssist || 0) + Math.atan(r / d);
   let best = null, bestD = Infinity;
   for (const m of state.monsters) {
     if (m.mode === MODES.GONE) continue;
     const d = dist(P.pos, m.pos);
     if (d > cfg.pistol.range || d < 0.01) continue;
-    const tol = cfg.pistol.aimTolerance + Math.atan(cfg.pistol.bodyRadius / d);
-    const rel = Math.abs(wrapAngle(bearingTo(P.pos, m.pos) - aim));
-    if (rel <= tol && d < bestD) { best = m; bestD = d; }
+    if (Math.abs(wrapAngle(bearingTo(P.pos, m.pos) - aim)) <= cone(cfg.pistol.bodyRadius, d) && d < bestD) { best = { monster: m, pos: m.pos, d }; bestD = d; }
   }
-  // hazards in the line of fire (tentacles, the zombie): the nearer of those and the best monster takes it
-  let hz = null, hzD = Infinity;
   for (const h of hazardTargets(state)) {
     const d = dist(P.pos, h.pos);
     if (d > cfg.pistol.range || d < 0.01) continue;
-    const tol = cfg.pistol.aimTolerance + Math.atan(h.radius / d);
-    if (Math.abs(wrapAngle(bearingTo(P.pos, h.pos) - aim)) <= tol && d < hzD) { hz = h; hzD = d; }
+    if (Math.abs(wrapAngle(bearingTo(P.pos, h.pos) - aim)) <= cone(h.radius, d) && d < bestD) { best = { hazard: h, pos: h.pos, d }; bestD = d; }
   }
-  if (hz && hzD < bestD) {
+  return best;
+}
+
+export function fire(state) {
+  const { player: P, cfg } = state;
+  const aim = aimYaw(state); // the shot goes where you're pointing right now, waver included
+  const target = aimTarget(state);
+  P.mag--;
+  P.fireCd = cfg.pistol.fireCooldown;
+  P.recoil = Math.min(cfg.pistol.recoilMax, P.recoil + cfg.pistol.recoilKick);
+  P.recoilPhase = state.rng.range(0, Math.PI * 2);
+  scatterSwarm(state); // any shot, hit or miss, scatters the swarm
+  const best = target?.monster || null;
+  const hz = target?.hazard || null;
+  if (hz) {
     emit(state, 'shot', { hit: null, hazard: true, mag: P.mag });
     emit(state, 'bullet_impact', { pos: { ...hz.pos }, hit: null });
     hz.onHit();

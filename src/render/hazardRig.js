@@ -63,7 +63,7 @@ export function createHazardRig(scene, cfg) {
     zombie.add(zModel);
   });
 
-  let gustK = 0, gustDir = 0, time = 0;
+  let gustK = 0, gustDir = 0, time = 0, downK = 0;
 
   function updateTentacles(state) {
     const alive = new Set();
@@ -146,14 +146,19 @@ export function createHazardRig(scene, cfg) {
         legL.rotation.x = walking ? Math.sin(w) * 0.35 : 0; legR.rotation.x = walking ? -Math.sin(w) * 0.35 : 0;
         zombie.rotation.z = walking ? Math.sin(w) * 0.08 : Z.state === 'stagger' ? -0.15 : 0;
         if (zModel) { zModel.position.y = walking ? Math.abs(Math.sin(w)) * 0.05 : 0; zModel.rotation.x = Z.state === 'grab' ? 0.25 : Z.state === 'stagger' ? -0.3 : 0.08; }
+        // knocked down: flat on its back in the snow (it twitches now and then)
+        const down = Z.state === 'down';
+        downK += ((down ? 1 : 0) - downK) * Math.min(1, dt * (down ? 6 : 2.5));
+        zombie.rotation.x = -downK * Math.PI / 2 + (down ? Math.sin(time * 9) * 0.02 * (Math.sin(time * 1.7) > 0.8 ? 1 : 0) : 0);
+        zombie.position.y = downK * 0.15;
         armL.rotation.x = Z.state === 'grab' ? -1.55 : -1.3 + Math.sin(w * 0.5) * 0.1;
         armR.rotation.x = Z.state === 'grab' ? -1.55 : -1.2 + Math.cos(w * 0.5) * 0.1;
         head.rotation.z = 0.25 + Math.sin(time * 1.3) * 0.15;
       }
 
-      // gust: no fog change — the snow triples and blows hard one way (see snow.js)
-      const target = hz.gust && hz.gust.phase === 'blow' ? 1 : 0;
-      gustK += (target - gustK) * Math.min(1, dt * 2.5);
+      // gust: no fog change — the snow thickens and blows hard one way (see snow.js), ramped by the sim, capped at peak
+      const target = hz.gust && hz.gust.phase === 'blow' ? (hz.gust.k || 0) * cfg.hazards.gust.peak : 0; // the sim ramps it
+      gustK += (target - gustK) * Math.min(1, dt * 4);
       if (hz.gust) gustDir = hz.gust.dir;
       return { k: gustK, dir: gustDir };
     },
