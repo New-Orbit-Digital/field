@@ -70,7 +70,8 @@ export function attackerCount(state) {
 }
 export function attackerCap(state) {
   const mc = state.cfg.monster;
-  return mc.attackerCapBase + Math.floor((Math.max(1, state.hordeTarget) - 1) / mc.attackerPerExtra);
+  const late = state.t >= state.cfg.difficulty.secondAttackerAt ? 1 : 0; // packet 08: two at once, later in the night
+  return mc.attackerCapBase + late + Math.floor((Math.max(1, state.hordeTarget) - 1) / mc.attackerPerExtra);
 }
 
 // Send one from the crowd (the one nearest a random bearing, so it can come from anywhere). Which kind is
@@ -113,6 +114,9 @@ export function stepHorde(state, dt) {
     state.waitSpawnTimer -= dt;
     if (state.waitSpawnTimer <= 0) { state.waitSpawnTimer = h.waitSpawnEvery; state.hordeTarget++; }
   }
+  // packet 08: the night gets harder as it goes — another hunter every difficulty step, whatever the phase
+  const d = cfg.difficulty;
+  if (d.hunterPerStep > 0) state.hordeTarget = Math.max(state.hordeTarget, 1 + Math.floor(state.t / d.stepEvery) * d.hunterPerStep);
   state.hordeTarget = Math.min(h.max, state.hordeTarget);
 
   // too few hunting? after a short delay, another one breaks off from the crowd

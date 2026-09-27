@@ -149,7 +149,7 @@ export function createSounds({ ctx, master, noiseBuf }) {
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(gain, t + 0.1);
-    g.gain.setValueAtTime(gain, t + dur - 1.5);
+    g.gain.setValueAtTime(gain, Math.max(t + 0.1, t + dur - 1.5)); // short hisses: fade from the top (a negative time throws)
     g.gain.linearRampToValueAtTime(0, t + dur);
     const out = x === null ? master : panner(ctx, x, 0.3, z, { ref: 2, rolloff: 1.3 });
     if (out !== master) out.connect(master);

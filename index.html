@@ -28,18 +28,33 @@
   <div class="card" id="title">
     <h1><span class="r">F</span>IEL<span class="b">D</span></h1>
     <div class="sub">You pulled over when you saw the lights. The car's on its roof, the officer's gone, and the radio's dead. Something is out there. Fix it, call for help, and hold out until they come.</div>
-    <div class="controls">
-      <b>WASD</b><span>move</span>
-      <b>Mouse</b><span>look / aim</span>
-      <b>Hold right click</b><span>flashlight</span>
-      <b>Left click</b><span>shoot</span>
-      <b>R</b><span>reload (no flashlight while you do)</span>
-      <b>Hold E</b><span>use the car: radio · flares · stomp a tentacle</span>
-      <b>Q</b><span>drop a flare at your feet</span>
-      <b>Space</b><span>jump — push into the car mid-jump to climb up</span>
-      <b>Esc · `</b><span>pause · debug</span>
+    <div id="keys" aria-label="Controls">
+      <div class="kgrp kmove">
+        <div class="krow"><span class="kc">W</span></div>
+        <div class="krow"><span class="kc">A</span><span class="kc">S</span><span class="kc">D</span></div>
+        <div class="klab">Move</div>
+      </div>
+      <div class="kgrp kmouse">
+        <svg viewBox="0 0 200 150" width="200" height="150" aria-hidden="true">
+          <text x="18" y="18" class="mtxt">shoot</text>
+          <text x="182" y="30" class="mtxt" text-anchor="end">flashlight</text>
+          <line x1="52" y1="24" x2="84" y2="54" class="mline" />
+          <line x1="150" y1="36" x2="118" y2="60" class="mline" />
+          <rect x="72" y="40" width="56" height="100" rx="26" class="mbody" />
+          <line x1="72" y1="82" x2="128" y2="82" class="mline" />
+          <line x1="100" y1="40" x2="100" y2="82" class="mline" />
+          <rect x="95" y="50" width="10" height="20" rx="4" class="mwheel" />
+        </svg>
+        <div class="klab">Aim with the mouse</div>
+      </div>
+      <div class="kgrp kjump"><span class="kc kspace">Space</span><div class="klab">Jump</div></div>
+      <div class="kgrid">
+        <div class="kgrp"><span class="kc">R</span><div class="klab">Reload</div></div>
+        <div class="kgrp"><span class="kc">E</span><div class="klab">Interact</div></div>
+        <div class="kgrp"><span class="kc">Q</span><div class="klab">Flare</div></div>
+        <div class="kgrp"><span class="kc kesc">Esc</span><div class="klab">Pause</div></div>
+      </div>
     </div>
-    <div class="sub">They hate the light. Don't go out into the dark — they're waiting there. Headphones — listen.</div>
     <div class="sub" id="bestTitle"></div>
     <div id="hzPick" hidden>
       <div class="sub">HAZARD SANDBOX — pick one to test on its own · in play, keys 1 fire · 2 tentacle · 3 whiteout · 4 zombie</div>
@@ -47,9 +62,10 @@
       <button data-hz="tentacle">Tentacle<span>goes for the car</span></button>
       <button data-hz="gust">Whiteout<span>one now, then at random</span></button>
       <button data-hz="zombie">Zombie<span>A/D to shove it off</span></button>
-      <button data-hz="">Normal night<span>random whiteouts + tentacles</span></button>
+      <button data-hz="">Normal night<span>every hazard, at random</span></button>
     </div>
     <div class="cta" id="cta">Click to begin</div>
+    <div class="sub headphones">Headphones strongly encouraged</div>
     <div class="sub" id="demoNote" hidden>You need a keyboard and mouse to play. On this device you'll watch a scripted player instead. Turn the sound up.</div>
     <div class="sub" style="margin-top:14px;font-size:11px">seed <span id="titleSeed"></span></div>
   </div>

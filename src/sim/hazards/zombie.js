@@ -18,6 +18,12 @@ export function spawnZombie(state) {
   emit(state, 'zombie_start', { pos: { ...pos } });
 }
 
+// Normal night (packet 08): the first zombie walks in at firstAt; after that respawnAfter handles it.
+export function stepZombieSchedule(state) {
+  const zc = state.cfg.hazards.zombie, hz = state.hazards;
+  if (zc.random && !hz.zombieFirstDone && state.t >= zc.firstAt) { hz.zombieFirstDone = true; if (!hz.zombie) spawnZombie(state); }
+}
+
 export function stepZombie(state, input, dt) {
   const hz = state.hazards;
   if (hz.zombieRespawn != null) { hz.zombieRespawn -= dt; if (hz.zombieRespawn <= 0) spawnZombie(state); }

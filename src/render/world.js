@@ -53,6 +53,17 @@ export function createWorld(canvas, cfg) {
   const hazardRig = createHazardRig(scene, cfg);
   const scenery = createScenery(scene, cfg);   // dead trees + zombies at the edge (once their models load)
   const modelsReady = loadModels();              // every rig starts procedural and swaps as models arrive
+  // Nothing is drawn until the models have settled (loaded or failed), so the title screen never flashes the
+  // procedural stand-ins before the real models swap in. Then every material is compiled up front (warmUp), so
+  // the first click doesn't stall on shader compiles (packet 08).
+  let modelsSettled = false;
+  modelsReady.then(() => { modelsSettled = true; warmUp(); });
+  function warmUp() {
+    const hidden = [];
+    scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
+    try { renderer.compile(scene, cam.camera); if (psx) psx.render(scene, cam.camera); } catch (e) { console.error(e); }
+    for (const o of hidden) o.visible = false;
+  }
 
   // vapour: both engines idling, and your breath in the cold
   const puffs = createPuffs(scene);
@@ -106,6 +117,7 @@ export function createWorld(canvas, cfg) {
     snow.update(dt, state.player.pos, gust);
     cam.update(state, view, py, dt);
     debugRings.visible = view.debug;
+    if (!modelsSettled) { renderer.setRenderTarget(null); renderer.clear(); return; } // see modelsSettled above
     if (psx) psx.render(scene, cam.camera);
     else renderer.render(scene, cam.camera);
   }

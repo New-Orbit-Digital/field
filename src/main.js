@@ -29,7 +29,9 @@ function seedHazards(g) {
 }
 let game = createGame(seed);
 const world = createWorld(canvas, game.cfg);
-let audio = null;
+// Audio is created (and its recordings fetched and decoded) at page load, not on the first click, so starting a
+// night doesn't stall. The context starts suspended; the first click resumes it (packet 08).
+let audio = createAudio();
 
 const view = { pitch: -0.05, debug: params.has('debug'), moving: false };
 let phase = 'title'; // title | playing | paused | over

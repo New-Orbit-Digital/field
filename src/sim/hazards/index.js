@@ -1,12 +1,12 @@
-// Hazards (packet 05, revised in packet 07). Active: fire, tentacle, whiteout, zombie. Backlogged (code kept,
-// out of the sandbox): swarm, cold. Whiteouts and the tentacle are part of a normal night (random); fire and
-// the zombie are tested one at a time in the sandbox (?hazard) until they're scheduled.
+// Hazards. Active: fire, tentacle, whiteout, zombie — all part of a normal night since packet 08 (each has a
+// `random` switch in config). The sandbox (?hazard) still tests them one at a time. Backlogged (code kept,
+// out of the sandbox): swarm, cold.
 import { armFire, spawnFire, stepFire, stepKnockdown } from './fire.js';
 import { scatterSwarm, spawnSwarm, stepSwarm } from './swarm.js';
 import { spawnTentacle, stepTentacles, stepTentacleSchedule, tentacleTargets } from './tentacles.js';
 import { startCold, stepCold } from './cold.js';
 import { spawnGust, stepGust, stepGustSchedule } from './gust.js';
-import { spawnZombie, stepZombie, zombieTargets } from './zombie.js';
+import { spawnZombie, stepZombie, stepZombieSchedule, zombieTargets } from './zombie.js';
 
 export const HAZARD_KINDS = ['fire', 'tentacle', 'gust', 'zombie'];   // the sandbox's list (keys 1–4)
 export const BACKLOG_HAZARDS = ['swarm', 'cold'];                     // parked (Justin, 2026-09-26)
@@ -23,11 +23,13 @@ export function spawnHazard(state, kind) {
 }
 
 // The sandbox's way to start one hazard: like spawnHazard, except fire waits for the first flare to go out.
-// Testing one hazard switches the night's random ones (whiteouts, tentacles) off, unless it's that one.
+// Testing one hazard switches the night's other random ones (whiteouts, tentacles, fire, zombie) off.
 export function isolateHazard(state, kind) {
   const h = state.cfg.hazards;
   if (kind !== 'gust') h.gust.random = false;
   if (kind !== 'tentacle') h.tentacles.random = false;
+  if (kind !== 'fire') h.fire.random = false;
+  if (kind !== 'zombie') h.zombie.random = false;
 }
 export function startHazardTest(state, kind) {
   if (kind === 'fire') armFire(state);
@@ -38,6 +40,7 @@ export function startHazardTest(state, kind) {
 export function stepHazards(state, input, dt) {
   state.player.speedMult = 1; // hazards multiply into this for next tick's movement
   stepKnockdown(state, dt);
+  if (state.cfg.hazards.fire.random && !state.hazards.fireScheduled) { state.hazards.fireScheduled = true; armFire(state); }
   stepFire(state, dt);
   if (!state.alive) return;
   stepSwarm(state, dt);
@@ -47,6 +50,7 @@ export function stepHazards(state, input, dt) {
   stepCold(state, input, dt);
   stepGustSchedule(state, dt);
   stepGust(state, dt);
+  stepZombieSchedule(state);
   stepZombie(state, input, dt);
 }
 
