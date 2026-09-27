@@ -12,7 +12,7 @@ const PROMPTS = {
   flares: (g) => g.player.flares >= g.cfg.flares.carryMax ? 'Holding a flare' : g.t < g.flareReadyAt ? `Next flare ${Math.ceil(g.flareReadyAt - g.t)}s` : `${KEY('E')} Flare`,
 };
 const ACTIONABLE = (html) => html.includes('class="key"');
-let lastPrompt = null, lastSpot = null, lastFlare = null, lastShotAt = -99, lastDots = null;
+let lastPrompt = null, lastSpot = null, lastFlare = null, lastShotAt = -99, lastDots = null, hpShowUntil = 0, hpShown = 1;
 
 const place = (el, p, dy = 0) => { el.style.transform = `translate(${p.x.toFixed(1)}px, ${(p.y + dy).toFixed(1)}px) translate(-50%, -100%)`; };
 
@@ -23,15 +23,22 @@ export function update(game, phase, world, view = {}) {
 
   // health: a bar under your feet, only while you're hurt (it fills back up as you recover). The pulsing red
   // screen edge it replaced was a full-screen animated shadow and cost too much frame time (Justin, packet 07).
-  const hpBar = $('hpBar');
-  const hurtNow = playing && game.alive && P.health < cfg.player.maxHealth;
-  hpBar.hidden = !hurtNow;
-  if (hurtNow) {
+  // It refills smoothly while you recover (the next point creeps in over regenEvery), shows full for a moment, then hides.
+  const hpBar = $('hpBar'), pc = cfg.player;
+  const now = performance.now();
+  const hurt = playing && game.alive && P.health < pc.maxHealth;
+  if (hurt) hpShowUntil = now + 900;
+  const regenFrac = hurt && P.hurtT >= pc.regenDelay ? Math.min(1, (P.regenT || 0) / pc.regenEvery) : 0;
+  const target = Math.max(0, P.health + regenFrac) / pc.maxHealth;
+  hpShown += (target - hpShown) * (target < hpShown ? 1 : Math.min(1, 0.12)); // drops at once, rises smoothly
+  const showHp = playing && game.alive && now < hpShowUntil;
+  hpBar.hidden = !showHp;
+  if (showHp) {
     const ft = world.feetScreen(game);
     hpBar.hidden = !ft.visible;
     hpBar.style.transform = `translate(${ft.x.toFixed(1)}px, ${(ft.y + 14).toFixed(1)}px) translate(-50%, 0)`;
-    $('hpFill').style.width = `${(100 * Math.max(0, P.health) / cfg.player.maxHealth).toFixed(0)}%`;
-  }
+    $('hpFill').style.width = `${(100 * hpShown).toFixed(1)}%`;
+  } else hpShown = target;
 
   // bottom right: just the flare hint now
   const flareHtml = P.flares > 0 ? `<span class="hint flare">${KEY('Q')} drop flare</span>` : '';
