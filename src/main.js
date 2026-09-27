@@ -19,7 +19,7 @@ let seed = params.get('seed') || randomSeed();
 // Hazard sandbox (packet 05): test one hazard at a time. ?hazard (or a test build with FIELD_SANDBOX set)
 // shows a picker on the title screen; ?hazard=fire starts straight into that one. In play, keys 1–4
 // spawn fire · tentacle · whiteout · zombie again (fire from the key catches straight away). Testing one
-// hazard switches off the night's random ones (whiteouts, tentacles), unless it's the one being tested.
+// hazard switches off the night's other random ones (whiteouts, tentacles, fire, zombie).
 const sandbox = params.has('hazard') || !!window.FIELD_SANDBOX;
 const sandboxList = (params.get('hazard') || '').split(',').map((k) => k.trim()).filter(Boolean);
 let startHazards = sandboxList.includes('all') ? HAZARD_KINDS : sandboxList.filter((k) => HAZARD_KINDS.includes(k) || k === 'tentacles');
@@ -34,7 +34,7 @@ const world = createWorld(canvas, game.cfg);
 let audio = createAudio();
 
 const view = { pitch: -0.05, debug: params.has('debug'), moving: false };
-let phase = 'title'; // title | playing | paused | over
+let phase = 'title'; // title | intro | playing | paused | over
 let eventCursor = 0;
 let best = Number(safeGet('field.best') || 0);
 
@@ -72,7 +72,7 @@ if (sandbox) {
   });
 }
 $('overlay').addEventListener('click', () => {
-  if (phase === 'title') start(seed);
+  if (phase === 'title') runIntro();
   else if (phase === 'paused') resume();
   else if (phase === 'over') start(randomSeed());
 });
@@ -80,7 +80,25 @@ addEventListener('resize', () => world.resize());
 
 function lock() { if (!demo) canvas.requestPointerLock?.(); }
 
+// First load only (packet 09): the title sits on black. The click captures the mouse and starts a sound sequence
+// — car door, footsteps, the wind fading in — for at least 8 s and until everything is loaded and warmed up;
+// then the first flare strikes, the black lifts and the night starts. Restarts skip this.
+const INTRO_MIN_MS = 8000;
+async function runIntro() {
+  phase = 'intro';
+  lock();
+  audio.resume();
+  $('overlay').classList.add('intro');
+  audio.intro.start();
+  await Promise.all([world.ready, new Promise((r) => setTimeout(r, INTRO_MIN_MS))]);
+  audio.intro.end();
+  $('overlay').classList.remove('intro');
+  start(seed);
+  if (!demo && document.pointerLockElement !== canvas) pause(); // they let go of the mouse during the intro
+}
+
 function start(newSeed) {
+  $('blackout').classList.add('gone');
   seed = newSeed;
   game = createGame(seed);
   world.reset();
@@ -162,7 +180,7 @@ requestAnimationFrame(frame);
 // Test hook for headless screenshots (no pointer lock / audio needed).
 window.__field = {
   get game() { return game; },
-  startHeadless(s) { seed = s; game = createGame(s); world.reset(); seedHazards(game); eventCursor = 0; phase = 'playing'; showOverlay(null); },
+  startHeadless(s) { seed = s; game = createGame(s); world.reset(); seedHazards(game); eventCursor = 0; phase = 'playing'; showOverlay(null); $('blackout').classList.add('gone'); },
   set(fn) { fn(game, view); },
   get world() { return world; },
   modelsReady: () => world.modelsReady.then(() => world.loadedModels()),

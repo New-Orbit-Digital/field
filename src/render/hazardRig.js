@@ -101,7 +101,7 @@ export function createHazardRig(scene, cfg) {
           const on = F.phase !== 'smolder' && 2.1 - lx < lenBurning;
           f.s.visible = on;
           if (!on) continue;
-          const w = carToWorld(cfg, { x: lx, z: f.z });
+          const w = carToWorld(state.cfg, { x: lx, z: f.z }); // the live car (this rig's cfg is the title screen's; the tentacle moves the car)
           const k = 0.5 + 0.5 * Math.sin(time * 9 + f.seed * 7);
           f.s.position.set(w.x, cfg.car.top + 0.2 + k * 0.5, w.z);
           f.s.scale.setScalar((0.8 + k * 0.7) * (0.6 + grow * 0.6));

@@ -7,7 +7,7 @@ import { $, KEY } from './dom.js';
 // Prompt text when you're standing at a car spot and facing it — short; it hovers over the spot itself.
 const PROMPTS = {
   radio: (g) => g.radio.phase === 'repair' ? `${KEY('E')} Fix radio` : g.radio.phase === 'call' ? `${KEY('E')} Call for help` : 'Help is coming',
-  ammo: (g) => g.hazards.fire && !g.player.hasExtinguisher ? `${KEY('E')} Extinguisher` : 'Trunk', // ammo is unlimited now; the trunk only has the extinguisher
+  ammo: (g) => g.hazards.fire && g.player.extinguisher <= 0 ? `${KEY('E')} Extinguisher` : 'Trunk', // ammo is unlimited now; the trunk only has the extinguisher
   fire: (g) => g.player.extinguisher > 0 ? `${KEY('E')} Spray` : `${KEY('E')} Kick snow`,
   flares: (g) => g.player.flares >= g.cfg.flares.carryMax ? 'Holding a flare' : g.t < g.flareReadyAt ? `Next flare ${Math.ceil(g.flareReadyAt - g.t)}s` : `${KEY('E')} Flare`,
 };
@@ -92,7 +92,7 @@ export function update(game, phase, world, view = {}) {
         : R.phase === 'wait' ? 1 - Math.max(0, R.rescueLeft) / cfg.radio.rescueTime : 1;
     } else if (P.interacting) {
       if (spot === 'fire') prog = game.hazards.fire ? game.hazards.fire.douse / cfg.hazards.fire.douse : 1;
-      else if (spot === 'ammo' && game.hazards.fire && !P.hasExtinguisher) prog = P.hold / cfg.hazards.fire.extinguisherPickup;
+      else if (spot === 'ammo' && game.hazards.fire && P.extinguisher <= 0) prog = P.hold / cfg.hazards.fire.extinguisherPickup;
       else prog = P.hold / (spot === 'ammo' ? cfg.pistol.pickupTime : cfg.flares.pickupTime);
     }
     $('spotProg').hidden = !showProg;

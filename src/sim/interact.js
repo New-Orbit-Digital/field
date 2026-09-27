@@ -7,7 +7,7 @@ import { douseFire } from './hazards/fire.js';
 export function spotUsable(state, name) {
   const { player: P, cfg, radio } = state;
   if (name === 'fire') return !!state.hazards?.fire;
-  if (name === 'ammo' && state.hazards?.fire && !P.hasExtinguisher) return true; // the extinguisher's in there
+  if (name === 'ammo' && state.hazards?.fire && P.extinguisher <= 0) return true; // a fresh extinguisher, whenever yours is empty
   if (name === 'radio') return radio.phase === 'repair' || radio.phase === 'call';
   if (name === 'ammo') return false; // ammo is unlimited now; the trunk only matters for the extinguisher
   if (name === 'flares') return P.flares < cfg.flares.carryMax && state.carFlares > 0 && state.t >= state.flareReadyAt;
@@ -39,7 +39,7 @@ export function doInteract(state, name, dt) {
   }
   if (name === 'fire') { douseFire(state, dt); return; }
   P.hold += dt;
-  if (name === 'ammo' && state.hazards?.fire && !P.hasExtinguisher) {
+  if (name === 'ammo' && state.hazards?.fire && P.extinguisher <= 0) {
     if (P.hold >= cfg.hazards.fire.extinguisherPickup) {
       P.hasExtinguisher = true; P.extinguisher = cfg.hazards.fire.extinguisherCharge; P.hold = 0;
       emit(state, 'extinguisher_pickup');

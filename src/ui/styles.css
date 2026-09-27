@@ -46,6 +46,13 @@ html, body { margin: 0; height: 100%; background: #000; color: var(--fg); font: 
 #vignette { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 180px 60px rgba(0,0,0,.85); }
 #vignette.hit { animation: hit .7s ease-out; }
 @keyframes hit { 0% { box-shadow: inset 0 0 220px 120px rgba(160,0,0,.9); } 100% { box-shadow: inset 0 0 180px 60px rgba(0,0,0,.85); } }
+/* packet 09: first-load intro — black until the night starts; on the click everything but the headphones line fades */
+#blackout { position: fixed; inset: 0; background: #000; transition: opacity .8s; }
+#blackout.gone { opacity: 0; pointer-events: none; }
+#title > * { transition: opacity 1.2s; }
+#overlay.intro { cursor: none; }
+#overlay.intro #title > *:not(.headphones) { opacity: 0; }
+#overlay.intro .cta { animation: none; } /* the blink animation would override the fade */
 #overlay { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.72); cursor: pointer; overflow: auto; }
 #overlay[hidden], [hidden] { display: none !important; }
 .card { text-align: center; max-width: 600px; padding: 24px; }

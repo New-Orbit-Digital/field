@@ -9,6 +9,7 @@ export const SFX_FILES = [
   'flashlight-on-off.mp3', 'growl1.mp3', 'growl2.mp3', 'growl3.mp3', 'growl4.mp3', 'gunshot.mp3',
   'hazard-lights.mp3', 'monster-flee.mp3', 'monster-footsteps.mp3', 'passing-car-ambience.mp3',
   'reload-success.mp3', 'reloading.mp3', 'wind-ambience.mp3', 'whiteout.mp3', 'glass-breaking.mp3',
+  'car-door.mp3',
 ];
 
 function sfxUrl(file) {
@@ -33,6 +34,11 @@ export function createSamples({ ctx, master }) {
   }
 
   const has = (name) => buffers.has(name);
+  // resolves once the file has loaded (or after `timeout` ms, if it's slow or missing)
+  const ready = (name, timeout = 3000) => (buffers.has(name) ? Promise.resolve(true) : new Promise((res) => {
+    waiting.set(name, [...(waiting.get(name) || []), () => res(true)]);
+    setTimeout(() => res(buffers.has(name)), timeout);
+  }));
 
   // One-shot. pos = {x, z, y?} for a positional sound, or null for "in your hands". Returns a handle or null.
   function play(name, { pos = null, gain = 1, rate = 1, offset = 0, ref = 2, rolloff = 1.1 } = {}) {
@@ -90,5 +96,5 @@ export function createSamples({ ctx, master }) {
     };
   }
 
-  return { has, play, loop };
+  return { has, play, loop, ready };
 }
