@@ -2,6 +2,7 @@
 import { emit } from './events.js';
 import { forward, len } from './math.js';
 import { pushOutOfCar } from './car.js';
+import { flareLandScare } from './monster.js';
 
 export function startFlare(state) {
   const { cfg } = state;
@@ -15,7 +16,7 @@ export function stepFlares(state, dt) {
   const fc = state.cfg.flares;
   for (const f of state.flares) {
     f.t += dt;
-    if (f.state === 'flying' && f.t >= fc.flightTime) { f.state = 'burning'; f.t = 0; emit(state, 'flare_land', { pos: { ...f.pos }, burn: f.burn }); }
+    if (f.state === 'flying' && f.t >= fc.flightTime) { f.state = 'burning'; f.t = 0; emit(state, 'flare_land', { pos: { ...f.pos }, burn: f.burn }); flareLandScare(state, f.pos); }
     else if (f.state === 'burning' && f.t >= f.burn) { f.state = 'out'; emit(state, 'flare_out', { pos: { ...f.pos } }); }
   }
   state.flares = state.flares.filter((f) => f.state !== 'out');
