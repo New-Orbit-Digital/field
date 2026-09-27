@@ -8,7 +8,7 @@ export const SFX_FILES = [
   'engine-loop.wav', 'failed-reload.mp3', 'far-away-growl.mp3', 'far-away-growl2.mp3', 'far-away-growl3.mp3',
   'flashlight-on-off.mp3', 'growl1.mp3', 'growl2.mp3', 'growl3.mp3', 'growl4.mp3', 'gunshot.mp3',
   'hazard-lights.mp3', 'monster-flee.mp3', 'monster-footsteps.mp3', 'passing-car-ambience.mp3',
-  'reload-success.mp3', 'reloading.mp3',
+  'reload-success.mp3', 'reloading.mp3', 'wind-ambience.mp3', 'whiteout.mp3', 'glass-breaking.mp3',
 ];
 
 function sfxUrl(file) {

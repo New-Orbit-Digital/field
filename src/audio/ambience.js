@@ -13,6 +13,8 @@ export function createAmbience({ ctx, master, noiseBuf }) {
   lfo.connect(lfoGain).connect(windGain.gain);
   wind.connect(windLp).connect(windGain).connect(master);
   wind.start(); lfo.start();
+  // the recorded wind loop (index.js) replaces this bed once it's playing
+  function muteWind() { windGain.gain.setTargetAtTime(0, ctx.currentTime, 1.5); lfoGain.gain.setTargetAtTime(0, ctx.currentTime, 1.5); }
 
   // electrical hum + radio from the car (positional, fixed at origin)
   const carPan = panner(ctx, 0, 0.6, 0, { ref: 2, rolloff: 1.4 });
@@ -77,5 +79,5 @@ export function createAmbience({ ctx, master, noiseBuf }) {
     rsGain.gain.value = 0;
   }
 
-  return { radioBurst, startSiren, tick, stopAll };
+  return { radioBurst, startSiren, tick, stopAll, muteWind };
 }
