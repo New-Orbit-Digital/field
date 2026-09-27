@@ -6,9 +6,11 @@ import { idleBot, reactiveBot, objectiveBot } from '../src/sim/bots.js';
 import { CONFIG } from '../src/sim/config.js';
 
 // These tests are about the monsters and the core loop; the bots don't know about the night's random hazards
-// (whiteouts, the car-dragging tentacle) yet, so switch those off for this file (tests run one file per process).
+// (whiteouts, the tentacle, fire, the zombie) yet, so switch those off for this file (tests run one file per process).
 CONFIG.hazards.gust.random = false;
 CONFIG.hazards.tentacles.random = false;
+CONFIG.hazards.fire.random = false;
+CONFIG.hazards.zombie.random = false;
 
 const SEEDS = Array.from({ length: 40 }, (_, i) => `T${i}`);
 const ticks = (s, n, input) => { for (let i = 0; i < n; i++) step(s, typeof input === 'function' ? input(s, i) : input); };
@@ -18,6 +20,7 @@ function quiet(s, keep = 0) {
   s.hordeTarget = 0;
   s.breakOffTimer = 1e9;
   s.cfg.horde.repairRampCap = 0;
+  s.cfg.difficulty.hunterPerStep = 0; // the night's rising difficulty is off on a quiet stage
   s.monsters.forEach((m, i) => { if (i >= keep) { m.mode = MODES.SHAMBLE; m.pos = { x: Math.sin(i) * 26, z: Math.cos(i) * 26 }; m.wander = { ...m.pos }; m.wanderT = 1e9; } });
 }
 
@@ -320,28 +323,25 @@ test('the night starts with a flare burning 5 m from the wreck, on the side away
   assert.ok(!s.flares.some((x) => x === f), 'start flare should burn out');
 });
 
-test('Q drops the flare at your feet; its circle keeps them out, and they will not attack you inside it', () => {
+test('Q drops the flare at your feet; landing startles whatever is close, but after that it is only light (packet 08)', () => {
   const s = createGame('FLARE');
-  quiet(s, 1);
+  quiet(s, 2);
   s.player.flares = 1;
   s.player.pos = { x: 6, z: 6 };
+  const [near, later] = s.monsters;
+  near.mode = MODES.STALK; near.pos = { x: 9, z: 7 }; near.timer = 999;
   ticks(s, 1, { yaw: 0, throw: true });
   ticks(s, 30, { yaw: 0 });
   const f = s.flares[0];
   assert.equal(f.state, 'burning');
   assert.ok(Math.hypot(f.pos.x - 6, f.pos.z - 6) < 1.2, 'not at the feet');
-  const m = s.monsters[0];
-  m.mode = MODES.STALK; m.pos = { x: f.pos.x + 6, z: f.pos.z }; m.timer = 999;
-  ticks(s, 2, { yaw: Math.PI });
-  assert.ok(s.events.some((e) => e.type === 'spotted' && e.id === m.id), 'stayed inside the flare');
-  // hunters wait at the edge while you stand in the light
-  s.hordeTarget = 3; s.breakOffTimer = 0; s.cfg.horde.repairRampCap = 3;
-  const n0 = s.events.length;
-  ticks(s, 60 * 12, { yaw: 0 });
-  assert.ok(!s.events.slice(n0).some((e) => e.type === 'warn'), 'attacked inside the flare');
-  assert.ok(hunterCount(s) > 0, 'nobody came to wait at the edge');
-  ticks(s, Math.ceil(s.cfg.flares.burnTime * 60), { yaw: 0 });
-  assert.equal(s.flares.length, 0, 'flare should burn out');
+  assert.equal(near.mode, MODES.RETREAT, 'the landing startled the one close by');
+  // a hunter coming in afterwards is not kept out, and will attack you inside the flare's light
+  later.mode = MODES.STALK; later.pos = { x: f.pos.x + 6, z: f.pos.z }; later.timer = 0.1; later.bearing = bearingTo(s.player.pos, later.pos);
+  s.hordeTarget = 2; s.breakOffTimer = 1e9;
+  ticks(s, 60 * 12, { yaw: Math.PI });
+  assert.ok(!s.events.some((e) => e.type === 'spotted' && e.id === later.id), 'the flare still spotted it');
+  assert.ok(s.events.some((e) => e.type === 'warn' && e.id === later.id), 'it never attacked inside the flare');
 });
 
 test('a guttering flare protects a shrinking circle, matching its dying light', () => {
