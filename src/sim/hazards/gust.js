@@ -1,6 +1,7 @@
 // Whiteout gusts: a warning, then a burst of blizzard from one direction. Flares burn down faster and the
 // flashlight cuts in and out. Intensity (G.k) ramps up and down; the renderer drives the snow along G.dir.
 import { emit } from '../events.js';
+import { pushOutOfCar } from '../car.js';
 
 export function spawnGust(state) {
   const hz = state.hazards;
@@ -32,5 +33,12 @@ export function stepGust(state, dt) {
   G.flickT += dt;
   if (G.flickT >= gc.flickerEvery) { G.flickT = 0; G.flickOff = state.rng.chance(gc.flickerOffChance * G.k); }
   P.flicker = G.flickOff;
+  // the wind shoves you along with it — on the roof too, where it can blow you off the edge (grabbed or knocked
+  // flat, it doesn't move you)
+  if (P.grounded && !P.held && P.mantle <= 0) {
+    const f = gc.push * G.k * dt;
+    P.pos.x += Math.sin(G.dir) * f; P.pos.z += Math.cos(G.dir) * f;
+    if (!P.onCar) pushOutOfCar(state.cfg, P.pos, state.cfg.player.radius); // (off the roof edge, movement drops you)
+  }
   if (G.flickOff && P.flashlightOn) P.flashlightOn = false; // cuts out (quietly — no click)
 }

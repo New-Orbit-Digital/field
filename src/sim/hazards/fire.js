@@ -37,7 +37,12 @@ export function stepFire(state, dt) {
   const fc = state.cfg.hazards.fire;
   if (hz.fireArmed && !hz.fire && !hz.carBlown && !state.flares.some((f) => f.state !== 'out')) {
     hz.igniteT += dt;
-    if (hz.igniteT >= fc.igniteEvery) { hz.igniteT = 0; if (state.rng.chance(fc.igniteChance)) { hz.fireArmed = false; spawnFire(state); } }
+    if (hz.igniteT >= fc.igniteEvery) {
+      hz.igniteT = 0;
+      // once help is on the way, camping on the roof makes it likelier (packet 08)
+      const chance = fc.igniteChance * (state.radio.phase === 'wait' && state.player.onCar ? fc.roofIgniteMult : 1);
+      if (state.rng.chance(chance)) { hz.fireArmed = false; spawnFire(state); }
+    }
   }
   const f = hz.fire;
   if (!f) return;
@@ -86,7 +91,11 @@ export function douseFire(state, dt) {
     if (P.extinguisher === 0) emit(state, 'extinguisher_empty');
   }
   f.douse += dt * rate;
-  if (f.douse >= fc.douse) { state.hazards.fire = null; emit(state, 'fire_out'); }
+  if (f.douse >= fc.douse) {
+    state.hazards.fire = null;
+    if (fc.random) armFire(state); // in a normal night it can catch again
+    emit(state, 'fire_out');
+  }
 }
 
 export function fireWarmth(state, pos) {
