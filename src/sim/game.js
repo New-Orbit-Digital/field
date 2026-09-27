@@ -8,6 +8,7 @@ import { stepDeepDark, stepMonster } from './monster.js';
 import { stepPlayer } from './player.js';
 import { stepRadio } from './radio.js';
 import { createHazards, stepHazards } from './hazards/index.js';
+import { emit } from './events.js';
 
 // ---------- setup ----------
 export function createGame(seed, overrides = {}) {
@@ -63,6 +64,7 @@ export function createGame(seed, overrides = {}) {
       hasExtinguisher: false,
       flicker: false,      // flashlight cutting out in a gust
       flashlightBroken: false, // the explosion wrecked it: it never comes back on
+      prevHealth: cfg.player.maxHealth, hurtT: 99, regenT: 0, // health regen (stepRegen)
     },
     monsters: [],
     hazards: createHazards(),
@@ -87,6 +89,7 @@ export function step(state, input, dt = state.cfg.sim.dt) {
   if (!state.alive) return;
   state.t += dt;
   stepPlayer(state, input, dt);
+  stepRegen(state, dt);
   stepHazards(state, input, dt);
   if (!state.alive) return;
   stepRadio(state, dt);
@@ -94,6 +97,17 @@ export function step(state, input, dt = state.cfg.sim.dt) {
   stepHorde(state, dt);
   stepDeepDark(state);
   for (const m of state.monsters) stepMonster(state, m, dt);
+}
+
+// Health comes back: no damage for regenDelay s, then one hit back every regenEvery s, up to full.
+function stepRegen(state, dt) {
+  const P = state.player, pc = state.cfg.player;
+  if (P.health < (P.prevHealth ?? P.health)) { P.hurtT = 0; P.regenT = 0; }
+  P.prevHealth = P.health;
+  P.hurtT = (P.hurtT ?? 99) + dt;
+  if (P.health <= 0 || P.health >= pc.maxHealth || P.hurtT < pc.regenDelay) { P.regenT = 0; return; }
+  P.regenT = (P.regenT || 0) + dt;
+  if (P.regenT >= pc.regenEvery) { P.regenT = 0; P.health++; P.prevHealth = P.health; emit(state, 'healed', { health: P.health }); }
 }
 
 // Convenience for headless runs.
@@ -116,5 +130,5 @@ export { worldToCar, carToWorld, carDirToWorld, carDistance, spotWorld } from '.
 export { aimYaw, inViewGeometry, inBeam, inFlare, flareRadius, inDimArea, isLit, monsterVisible, inDeepDark } from './perception.js';
 export { MODES, HUNTING } from './modes.js';
 export { attackerCap, hunterCount } from './horde.js';
-export { reloadProgress } from './pistol.js';
-export { HAZARD_KINDS, spawnHazard, startHazardTest, fireLight, fireLightPos, exhaustPos } from './hazards/index.js';
+export { reloadProgress, aimTarget } from './pistol.js';
+export { HAZARD_KINDS, spawnHazard, startHazardTest, isolateHazard, fireLight, fireLightPos, exhaustPos } from './hazards/index.js';
