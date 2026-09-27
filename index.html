@@ -11,24 +11,16 @@
 <div id="vignette"></div>
 <div id="frost"></div>
 <div id="hud">
-  <div id="time">0:00</div>
-  <div id="objective"></div>
-  <div id="hazardLine"></div>
-  <div id="demoTag" hidden>DEMO · scripted player</div>
-  <div id="toast"></div>
   <div id="aim" hidden><div class="dot"></div><div id="reloadBar" hidden><div id="reloadZone"></div><div id="reloadMark"></div></div></div>
   <div id="prompt"></div>
-  <div id="progress" hidden><div id="progressFill"></div></div>
+  <div id="spotPrompt" hidden><div id="spotText"></div><div id="spotProg" hidden><div id="spotProgFill"></div></div></div>
+  <div id="aimHud" hidden><div id="battIcon"><div id="battLevel"></div></div><div id="ammoDots"></div></div>
+  <div id="hpBar" hidden><div id="hpFill"></div></div>
   <div id="status">
-    <div id="hp"></div>
-    <div class="label">FLASHLIGHT</div>
-    <div id="batt"><div id="battFill"></div></div>
     <div id="warmWrap" hidden><div class="label">WARMTH</div><div id="warm"><div id="warmFill"></div></div></div>
   </div>
   <div id="weapons">
     <div id="flare"></div>
-    <div id="ammo"></div>
-    <div class="label">PISTOL</div>
   </div>
 </div>
 <div id="debug" hidden><div id="debugText"></div><canvas id="minimap" width="220" height="220"></canvas></div>
@@ -42,7 +34,7 @@
       <b>Hold right click</b><span>flashlight</span>
       <b>Left click</b><span>shoot</span>
       <b>R</b><span>reload (no flashlight while you do)</span>
-      <b>Hold E</b><span>use the car: radio · trunk (ammo) · flares</span>
+      <b>Hold E</b><span>use the car: radio · flares · stomp a tentacle</span>
       <b>Q</b><span>drop a flare at your feet</span>
       <b>Space</b><span>jump — push into the car mid-jump to climb up</span>
       <b>Esc · `</b><span>pause · debug</span>
@@ -50,12 +42,12 @@
     <div class="sub">They hate the light. Don't go out into the dark — they're waiting there. Headphones — listen.</div>
     <div class="sub" id="bestTitle"></div>
     <div id="hzPick" hidden>
-      <div class="sub">HAZARD SANDBOX — pick one to test on its own</div>
+      <div class="sub">HAZARD SANDBOX — pick one to test on its own · in play, keys 1 fire · 2 tentacle · 3 whiteout · 4 zombie</div>
       <button data-hz="fire">Fire<span>may catch once the first flare dies</span></button>
       <button data-hz="tentacle">Tentacle<span>goes for the car</span></button>
       <button data-hz="gust">Whiteout<span>one now, then at random</span></button>
       <button data-hz="zombie">Zombie<span>A/D to shove it off</span></button>
-      <button data-hz="">Normal night<span>random whiteouts only</span></button>
+      <button data-hz="">Normal night<span>random whiteouts + tentacles</span></button>
     </div>
     <div class="cta" id="cta">Click to begin</div>
     <div class="sub" id="demoNote" hidden>You need a keyboard and mouse to play. On this device you'll watch a scripted player instead. Turn the sound up.</div>
