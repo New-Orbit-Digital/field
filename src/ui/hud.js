@@ -1,43 +1,61 @@
-// The in-game HUD: timer + objective, health, battery, ammo/flare with keycap hints, car prompts,
-// the aim dot (projected from the real aim, recoil included) and the active-reload bar.
+// The in-game HUD (packet 07): prompts that hover over the car spots (the radio's bar tracks the whole rescue),
+// battery + ammo dots beside the head while aiming, a health bar under the feet while hurt, the aim dot (on what a
+// shot would hit) and the active-reload bar under it. Nothing is written across the top of the screen.
 import { reloadProgress } from '../sim/game.js';
-import { $, fmt, KEY } from './dom.js';
+import { $, KEY } from './dom.js';
 
-// Prompt text when you're standing at a car spot and facing it.
+// Prompt text when you're standing at a car spot and facing it — short; it hovers over the spot itself.
 const PROMPTS = {
-  radio: (g) => g.radio.phase === 'repair' ? `${KEY('E')} Repair the radio` : g.radio.phase === 'call' ? `${KEY('E')} Call for help` : 'Radio: waiting on dispatch',
-  ammo: (g) => g.hazards.fire && !g.player.hasExtinguisher ? `${KEY('E')} Grab the extinguisher` : g.player.reserve < g.cfg.pistol.maxReserve ? `${KEY('E')} Grab ammo` : 'Ammo full',
-  fire: (g) => g.player.extinguisher > 0 ? `${KEY('E')} Spray the extinguisher · ${Math.round(100 * g.player.extinguisher / g.cfg.hazards.fire.extinguisherCharge)}%` : g.player.hasExtinguisher ? `${KEY('E')} Kick snow on it — the extinguisher's empty` : `${KEY('E')} Kick snow on the fire — there's an extinguisher in the trunk`,
-  flares: (g) => g.player.flares >= g.cfg.flares.carryMax ? 'Already holding a flare' : g.t < g.flareReadyAt ? `Digging out the next flare… ${Math.ceil(g.flareReadyAt - g.t)}s` : `${KEY('E')} Take a flare`,
+  radio: (g) => g.radio.phase === 'repair' ? `${KEY('E')} Fix radio` : g.radio.phase === 'call' ? `${KEY('E')} Call for help` : 'Help is coming',
+  ammo: (g) => g.hazards.fire && !g.player.hasExtinguisher ? `${KEY('E')} Extinguisher` : 'Trunk', // ammo is unlimited now; the trunk only has the extinguisher
+  fire: (g) => g.player.extinguisher > 0 ? `${KEY('E')} Spray` : `${KEY('E')} Kick snow`,
+  flares: (g) => g.player.flares >= g.cfg.flares.carryMax ? 'Holding a flare' : g.t < g.flareReadyAt ? `Next flare ${Math.ceil(g.flareReadyAt - g.t)}s` : `${KEY('E')} Flare`,
 };
-let lastPrompt = null, lastAmmo = null, lastFlare = null;
+const ACTIONABLE = (html) => html.includes('class="key"');
+let lastPrompt = null, lastSpot = null, lastFlare = null, lastShotAt = -99, lastDots = null;
 
-export function update(game, phase, world) {
+const place = (el, p, dy = 0) => { el.style.transform = `translate(${p.x.toFixed(1)}px, ${(p.y + dy).toFixed(1)}px) translate(-50%, -100%)`; };
+
+export function update(game, phase, world, view = {}) {
   const P = game.player, R = game.radio, cfg = game.cfg;
-  $('time').textContent = fmt(game.t);
-  $('objective').textContent =
-    R.phase === 'repair' ? `Fix the radio · ${Math.floor(100 * R.repair / cfg.radio.repairTime)}%`
-    : R.phase === 'call' ? `Call for help · ${Math.floor(100 * R.call / cfg.radio.callTime)}%`
-    : R.phase === 'wait' ? `Help is coming · ${fmt(Math.max(0, R.rescueLeft))}`
-    : 'Rescued';
-  $('hp').innerHTML = Array.from({ length: cfg.player.maxHealth }, (_, i) => `<span class="pip${i < P.health ? '' : ' lost'}"></span>`).join('');
-  const b = P.battery / cfg.flashlight.batteryMax;
-  $('battFill').style.width = `${(b * 100).toFixed(1)}%`;
-  $('batt').classList.toggle('locked', P.flashlightLocked);
-  $('batt').classList.toggle('low', b < 0.25);
+  const playing = phase === 'playing';
+  // nothing written across the top any more (packet 07): progress lives on the radio prompt's bar
 
-  // bottom right: ammo + reload hint, flare + drop hint
-  const ammoHtml = `<span class="count${P.mag === 0 && P.reloading <= 0 ? ' empty' : ''}">${P.mag} / ${P.reserve}</span>` +
-    (P.reloading > 0 ? '<span class="hint">reloading…</span>' : P.mag < cfg.pistol.magSize && P.reserve > 0 ? `<span class="hint">${KEY('R')} reload</span>` : '');
-  if (ammoHtml !== lastAmmo) { $('ammo').innerHTML = ammoHtml; lastAmmo = ammoHtml; }
+  // health: a bar under your feet, only while you're hurt (it fills back up as you recover). The pulsing red
+  // screen edge it replaced was a full-screen animated shadow and cost too much frame time (Justin, packet 07).
+  const hpBar = $('hpBar');
+  const hurtNow = playing && game.alive && P.health < cfg.player.maxHealth;
+  hpBar.hidden = !hurtNow;
+  if (hurtNow) {
+    const ft = world.feetScreen(game);
+    hpBar.hidden = !ft.visible;
+    hpBar.style.transform = `translate(${ft.x.toFixed(1)}px, ${(ft.y + 14).toFixed(1)}px) translate(-50%, 0)`;
+    $('hpFill').style.width = `${(100 * Math.max(0, P.health) / cfg.player.maxHealth).toFixed(0)}%`;
+  }
+
+  // bottom right: just the flare hint now
   const flareHtml = P.flares > 0 ? `<span class="hint flare">${KEY('Q')} drop flare</span>` : '';
   if (flareHtml !== lastFlare) { $('flare').innerHTML = flareHtml; lastFlare = flareHtml; }
 
-  // hazards: a status line under the objective, the warmth bar, frost at the edges
-  const hz = game.hazards, bits = [];
-  if (hz.fire) bits.push(hz.fire.phase === 'smolder' ? 'SMOKE AT THE ENGINE' : `ENGINE FIRE · ${Math.floor(hz.fire.burnT)}s — put it out`);
-  if (hz.gust && hz.gust.phase === 'blow') bits.push('WHITEOUT');
-  $('hazardLine').textContent = bits.join('   ');
+  // beside your head while aiming (right mouse), reloading or just after a shot: battery + the magazine as 6 dots
+  const aimHud = $('aimHud');
+  const showAim = playing && game.alive && (view.aiming || P.flashlightOn || P.reloading > 0 || performance.now() - lastShotAt < 1500);
+  aimHud.hidden = !showAim;
+  if (showAim) {
+    const h = world.headScreen(game);
+    aimHud.hidden = !h.visible;
+    aimHud.style.transform = `translate(${h.x.toFixed(1)}px, ${h.y.toFixed(1)}px) translate(calc(-100% - 38px), -50%)`; // beside the head, to the left
+    const b = P.flashlightBroken ? 0 : P.battery / cfg.flashlight.batteryMax;
+    const level = Math.ceil(b * 5 - 1e-6); // five steps, like a phone battery
+    $('battLevel').style.width = `${level * 20}%`;
+    $('battIcon').classList.toggle('low', level <= 1);
+    $('battIcon').classList.toggle('dead', P.flashlightLocked || P.flashlightBroken);
+    const dots = Array.from({ length: cfg.pistol.magSize }, (_, i) => `<i${i < P.mag ? '' : ' class="spent"'}></i>`).join('');
+    if (dots !== lastDots) { $('ammoDots').innerHTML = dots; lastDots = dots; }
+  }
+
+  // hazards: the warmth bar (backlogged) and frost at the edges
+  const hz = game.hazards;
   $('warmWrap').hidden = !hz.cold;
   if (hz.cold) {
     $('warmFill').style.width = `${(100 * P.heat / cfg.hazards.cold.max).toFixed(1)}%`;
@@ -45,27 +63,47 @@ export function update(game, phase, world) {
   }
   $('frost').style.opacity = hz.cold ? String(Math.max(0, 1 - P.heat / (cfg.hazards.cold.max * 0.5)).toFixed(2)) : '0';
 
-  // interaction prompt at the car (a grab overrides everything)
+  // the car-spot prompt hovers over the spot, with its progress bar under it (a stompable tentacle wins)
+  const sp = $('spotPrompt');
+  const stomp = playing && game.hazards.stompable;
+  const spot = playing && !P.held && P.activeSpot ? P.activeSpot : null;
+  if (stomp) {
+    const html = `${KEY('E')} Stomp`;
+    if (html !== lastSpot) { $('spotText').innerHTML = html; lastSpot = html; sp.classList.remove('dim'); }
+    const at = world.worldScreen(stomp.pos, 0.4);
+    sp.hidden = !at.visible; place(sp, at); $('spotProg').hidden = true;
+  } else if (spot) {
+    const html = PROMPTS[spot](game);
+    if (html !== lastSpot) { $('spotText').innerHTML = html; lastSpot = html; sp.classList.toggle('dim', !ACTIONABLE(html)); }
+    const at = world.spotScreen(game, spot);
+    sp.hidden = !at.visible;
+    place(sp, at);
+    let prog = 0, showProg = P.interacting;
+    if (spot === 'radio') { // the radio's bar is the whole rescue: repair, then the call, then help on its way
+      showProg = true;
+      prog = R.phase === 'repair' ? R.repair / cfg.radio.repairTime : R.phase === 'call' ? R.call / cfg.radio.callTime
+        : R.phase === 'wait' ? 1 - Math.max(0, R.rescueLeft) / cfg.radio.rescueTime : 1;
+    } else if (P.interacting) {
+      if (spot === 'fire') prog = game.hazards.fire ? game.hazards.fire.douse / cfg.hazards.fire.douse : 1;
+      else if (spot === 'ammo' && game.hazards.fire && !P.hasExtinguisher) prog = P.hold / cfg.hazards.fire.extinguisherPickup;
+      else prog = P.hold / (spot === 'ammo' ? cfg.pistol.pickupTime : cfg.flares.pickupTime);
+    }
+    $('spotProg').hidden = !showProg;
+    $('spotProgFill').style.width = `${Math.min(100, prog * 100).toFixed(1)}%`;
+  } else { sp.hidden = true; lastSpot = null; }
+
+  // bottom-centre: only for things that aren't at a spot (grabbed, knocked flat, on the roof)
   const held = P.held === 'zombie' ? `${KEY('A')} ${KEY('D')} ${KEY('A')} ${KEY('D')} shove it off — or shoot it` : P.held === 'down' ? 'Knocked flat…' : null;
   $('prompt').classList.toggle('urgent', !!held);
-  const prompt = held || (P.activeSpot ? PROMPTS[P.activeSpot](game) : P.onCar ? 'On the roof — you can see further, but you can\'t reach anything from up here' : '');
+  const prompt = held || (P.onCar ? 'On the roof — you can\'t reach anything from up here' : '');
   if (prompt !== lastPrompt) { $('prompt').innerHTML = prompt; lastPrompt = prompt; }
-  let prog = 0;
-  if (P.interacting) {
-    if (P.activeSpot === 'radio') prog = R.phase === 'repair' ? R.repair / cfg.radio.repairTime : R.call / cfg.radio.callTime;
-    else if (P.activeSpot === 'fire') prog = game.hazards.fire ? game.hazards.fire.douse / cfg.hazards.fire.douse : 1;
-    else if (P.activeSpot === 'ammo' && game.hazards.fire && !P.hasExtinguisher) prog = P.hold / cfg.hazards.fire.extinguisherPickup;
-    else prog = P.hold / (P.activeSpot === 'ammo' ? cfg.pistol.pickupTime : cfg.flares.pickupTime);
-  }
-  $('progress').hidden = !P.interacting;
-  $('progressFill').style.width = `${Math.min(100, prog * 100).toFixed(1)}%`;
 
   // aim dot follows where the gun/flashlight actually points (recoil included) — always shown, even with a dead battery
   const aim = world.aimScreen();
   const dot = $('aim');
-  dot.hidden = phase !== 'playing' || !aim.visible;
+  dot.hidden = !playing || !aim.visible;
   dot.style.transform = `translate(${aim.x.toFixed(1)}px, ${aim.y.toFixed(1)}px)`;
-  // active-reload bar under the dot (no instructions — players discover the flagged zone)
+  // active-reload bar under the aim dot (no instructions — players discover the flagged zone)
   const rb = $('reloadBar');
   rb.hidden = !(P.reloading > 0 && P.reloadWindow);
   if (!rb.hidden) {
@@ -77,16 +115,6 @@ export function update(game, phase, world) {
 }
 
 // ---------- transient feedback ----------
-let toastT = null;
-export function toast(msg) {
-  if (!msg) return;
-  const el = $('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  clearTimeout(toastT);
-  toastT = setTimeout(() => el.classList.remove('show'), 3500);
-}
-
 let dmgTimer = null;
 export function flashDamage() {
   const v = $('vignette');
@@ -97,25 +125,10 @@ export function flashDamage() {
   dmgTimer = setTimeout(() => v.classList.remove('hit'), 700);
 }
 
-// Event-driven HUD feedback.
-export function onEvent(e, game) {
+// Event-driven HUD feedback. (No text toasts any more: nothing is written across the top of the screen.)
+export function onEvent(e) {
   if (e.type === 'hit') flashDamage();
+  if (e.type === 'shot' || e.type === 'dry_fire') lastShotAt = performance.now();
   if (e.type === 'reload_jam') $('reloadBar').classList.add('jam');
   if (e.type === 'reload_start') $('reloadBar').classList.remove('jam');
-  if (e.type === 'radio_fixed') toast('Radio fixed. Call for help — hold E at the radio.');
-  if (e.type === 'radio_called') toast('Dispatch copies. Help is on the way. Hold out.');
-  if (e.type === 'monster_gone' && e.left === 0) toast('The field is quiet. Nothing left out there.');
-  if (e.type === 'lights_smashed') toast('Something smashed the lights on that side.');
-  if (e.type === 'interrupted') toast('The car lurched. Hold E again.');
-  const HZ_TOASTS = {
-    fire_start: 'Smoke from the engine…', fire_grow: 'The engine\'s on fire. Put it out before the tank goes.', fire_out: 'The fire\'s out.',
-    car_exploded: 'The car went up. The lights are gone.', flashlight_broken: 'Your flashlight\'s smashed.',
-    extinguisher_pickup: 'Got the extinguisher.', extinguisher_empty: 'The extinguisher is empty.',
-    swarm_start: 'Something small, lots of them — drawn to your light.', swarm_scattered: 'The gunshot scatters the swarm.',
-    tentacle_start: 'Something is sliding over the snow toward the car.', tentacle_drag: 'It\'s dragging the car into the dark! Shoot it!', tentacle_severed: 'You shot it loose.',
-    cold_start: 'It\'s getting colder. Keep moving; stay near the heat.', cold_numb: 'You can\'t feel your legs.',
-    gust_warn: 'The wind is picking up…',
-    zombie_start: 'Someone\'s walking toward you. It isn\'t stopping.', zombie_shoved: 'You shove it off.',
-  };
-  if (HZ_TOASTS[e.type]) toast(HZ_TOASTS[e.type]);
 }
